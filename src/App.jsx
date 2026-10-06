@@ -711,6 +711,10 @@ export default function App() {
 
     let updatedPlayers = players.map(p => ({ ...p }));
     let dayDeaths = [];
+    // Must live outside the winner/tie branch because it is used when building tempState.
+    // Previously this was declared inside the winner branch, causing a ReferenceError
+    // when PROSES HASIL VOTING was pressed.
+    let loverDeathNotice = [];
 
     if (topCandidates.length === 1 && maxVotes > 0) {
       // Single highest candidate eliminated
@@ -722,8 +726,6 @@ export default function App() {
       // Direct voting death
       let newDeathsMap = new Map();
       newDeathsMap.set(eliminatedId, 'VOTE');
-      const loverDeathNotice = [];
-
       // Recursive Lovers Chain for Voting
       let loversChainResolved = false;
       while (!loversChainResolved) {
