@@ -43,115 +43,34 @@ const LOCAL_STORAGE_KEY = 'WEREWOLF_MODERATOR_ASSISTANT_STATE_V2';
 
 // Role Definitions & Accents
 const ROLES = {
-  WARGA: {
-    name: 'Warga',
-    team: 'Warga',
-    icon: '👨',
-    color: 'text-slate-300',
-    bg: 'bg-slate-800/90',
-    border: 'border-slate-600',
-    accent: 'from-slate-700 to-slate-900',
-    desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi semua Werewolf melalui diskusi dan voting.'
-  },
-  WEREWOLF: {
-    name: 'Werewolf',
-    team: 'Werewolf',
-    icon: '🐺',
-    color: 'text-red-400',
-    bg: 'bg-red-950/90',
-    border: 'border-red-600',
-    accent: 'from-red-900 to-red-950',
-    desc: 'Setiap malam memilih 1 korban untuk dieliminasi. Werewolf saling mengetahui satu sama lain.'
-  },
-  GUARDIAN: {
-    name: 'Guardian',
-    team: 'Warga',
-    icon: '🛡️️',
-    color: 'text-blue-400',
-    bg: 'bg-blue-950/90',
-    border: 'border-blue-600',
-    accent: 'from-blue-900 to-blue-950',
-    desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak dapat melindungi pemain yang sama dua malam berturut-turut.'
-  },
-  WITCH: {
-    name: 'Witch',
-    team: 'Warga',
-    icon: '🧪',
-    color: 'text-purple-400',
-    bg: 'bg-purple-950/90',
-    border: 'border-purple-600',
-    accent: 'from-purple-900 to-purple-950',
-    desc: 'Memiliki 2 ramuan unik: Heal Potion (menyelamatkan korban Werewolf) dan Kill Potion (membunuh 1 pemain). Masing-masing hanya 1x pakai.'
-  },
-  SEER: {
-    name: 'Seer',
-    team: 'Warga',
-    icon: '🔮',
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-950/90',
-    border: 'border-cyan-600',
-    accent: 'from-cyan-900 to-cyan-950',
-    desc: 'Memilih 1 pemain setiap malam untuk mengetahui wujud/perannya.'
-  },
-  LYCAN: {
-    name: 'Lycan',
-    team: 'Warga',
-    icon: '🌙',
-    color: 'text-slate-300',
-    bg: 'bg-zinc-800/90',
-    border: 'border-zinc-500',
-    accent: 'from-zinc-700 to-zinc-900',
-    desc: 'Manusia biasa dari tim Warga, namun Seer akan melihatnya sebagai Werewolf.'
-  },
-  CUPID: {
-    name: 'Cupid',
-    team: 'Warga',
-    icon: '💘',
-    color: 'text-pink-400',
-    bg: 'bg-pink-950/90',
-    border: 'border-pink-600',
-    accent: 'from-pink-900 to-pink-950',
-    desc: 'Hanya aktif pada Malam 1. Memilih 2 pemain menjadi Pasangan (Lovers). Jika salah satu mati, pasangannya ikut mati.'
-  }
+  WARGA: { name: 'Warga', team: 'Warga', icon: '👨', color: 'text-slate-300', bg: 'bg-slate-800/90', border: 'border-slate-600', accent: 'from-slate-700 to-slate-900', desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi seluruh ancaman.' },
+  WEREWOLF: { name: 'Werewolf', team: 'Evil', icon: '🐺', color: 'text-red-400', bg: 'bg-red-950/90', border: 'border-red-600', accent: 'from-red-900 to-red-950', desc: 'Setiap malam memilih 1 korban. Sesama Werewolf saling mengetahui.' },
+  LYCAN: { name: 'Lycan', team: 'Evil', icon: '🌙', color: 'text-slate-200', bg: 'bg-zinc-800/90', border: 'border-zinc-500', accent: 'from-zinc-700 to-zinc-900', desc: 'Berada di tim Evil, tetapi tidak melakukan serangan malam. Seer akan melihatnya sebagai Werewolf.' },
+  CULTIST: { name: 'Cultist', team: 'Evil', icon: '🕯️', color: 'text-fuchsia-400', bg: 'bg-fuchsia-950/90', border: 'border-fuchsia-700', accent: 'from-fuchsia-900 to-fuchsia-950', desc: 'Anggota tim Evil tanpa aksi malam khusus. Tujuannya membantu tim Evil mencapai kemenangan.' },
+  SEER: { name: 'Seer', team: 'Warga', icon: '🔮', color: 'text-cyan-400', bg: 'bg-cyan-950/90', border: 'border-cyan-600', accent: 'from-cyan-900 to-cyan-950', desc: 'Setiap malam memeriksa 1 pemain untuk mengetahui wujud/perannya. Lycan terlihat sebagai Werewolf.' },
+  GUARDIAN: { name: 'Guardian', team: 'Warga', icon: '🛡️', color: 'text-blue-400', bg: 'bg-blue-950/90', border: 'border-blue-600', accent: 'from-blue-900 to-blue-950', desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak boleh melindungi pemain yang sama dua malam berturut-turut.' },
+  HUNTER: { name: 'Hunter', team: 'Warga', icon: '🏹', color: 'text-orange-400', bg: 'bg-orange-950/90', border: 'border-orange-600', accent: 'from-orange-900 to-orange-950', desc: 'Role Warga tambahan. Tidak memiliki aksi malam aktif dalam spesifikasi saat ini.' },
+  CUPID: { name: 'Cupid', team: 'Warga', icon: '💘', color: 'text-pink-400', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.' },
+  MAYOR: { name: 'Mayor', team: 'Warga', icon: '👑', color: 'text-amber-400', bg: 'bg-amber-950/90', border: 'border-amber-600', accent: 'from-amber-900 to-amber-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
+  SHERIFF: { name: 'Sheriff', team: 'Warga', icon: '⭐', color: 'text-yellow-300', bg: 'bg-yellow-950/90', border: 'border-yellow-600', accent: 'from-yellow-900 to-yellow-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
+  DOCTOR: { name: 'Doctor', team: 'Warga', icon: '⚕️', color: 'text-emerald-400', bg: 'bg-emerald-950/90', border: 'border-emerald-600', accent: 'from-emerald-900 to-emerald-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
+  PRIEST: { name: 'Priest', team: 'Warga', icon: '✝️', color: 'text-violet-300', bg: 'bg-violet-950/90', border: 'border-violet-600', accent: 'from-violet-900 to-violet-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
+  WITCH: { name: 'Witch', team: 'Warga', icon: '🧪', color: 'text-purple-400', bg: 'bg-purple-950/90', border: 'border-purple-600', accent: 'from-purple-900 to-purple-950', desc: 'Memiliki Heal Potion dan Kill Potion, masing-masing hanya 1x. Witch tidak melihat korban Werewolf dan harus menebak target Heal secara blind.' },
+  JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Role Neutral. Mekanik kemenangan khusus belum ditentukan dalam spesifikasi sumber.' },
+  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600', accent: 'from-indigo-900 to-indigo-950', desc: 'Role Neutral. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' }
 };
 
+const ROLE_KEYS = Object.keys(ROLES);
+const EVIL_ROLES = ['WEREWOLF', 'LYCAN', 'CULTIST'];
+
 function getRoleComposition(playerCount) {
-  switch (playerCount) {
-    case 5:
-      return ['WEREWOLF', 'GUARDIAN', 'SEER', 'WARGA', 'WARGA'];
-    case 6:
-      return ['WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'WARGA', 'WARGA'];
-    case 7:
-      return ['WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'WARGA', 'WARGA'];
-    case 8:
-      return ['WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'WARGA', 'WARGA'];
-    case 9:
-      return ['WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA'];
-    case 10:
-      return ['WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA'];
-    case 11:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA'];
-    case 12:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 13:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 14:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 15:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 16:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 17:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 18:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 19:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    case 20:
-      return ['WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'WEREWOLF', 'GUARDIAN', 'SEER', 'WITCH', 'CUPID', 'LYCAN', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA', 'WARGA'];
-    default:
-      return ['WEREWOLF', 'GUARDIAN', 'SEER', 'WARGA', 'WARGA'];
-  }
+  const wolves = Math.max(1, Math.floor(playerCount / 4));
+  const base = ['WEREWOLF'];
+  for (let i = 1; i < wolves; i++) base.push('WEREWOLF');
+  const specials = ['GUARDIAN', 'SEER', 'WITCH', 'CUPID'];
+  for (const r of specials) if (base.length < playerCount) base.push(r);
+  while (base.length < playerCount) base.push('WARGA');
+  return base.slice(0, playerCount);
 }
 
 function shuffle(array) {
@@ -182,6 +101,7 @@ function createInitialGameState() {
     seerTargetId: null,
     seerResult: null,
     witchHealUsedThisNight: false,
+    witchHealTargetId: null,
     witchKillTargetId: null,
 
     // Cupid selection buffer
@@ -206,6 +126,7 @@ function createInitialGameState() {
     lastNightDeaths: [],
     lastDayDeaths: [],
     loverDeathNotice: [],
+    roleCounts: {},
     winner: null, // "WARGA" | "WEREWOLF"
 
     // Undo Snapshot
@@ -237,6 +158,8 @@ export default function App() {
   const [playerCount, setPlayerCount] = useState(5);
   const [nameErrors, setNameErrors] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
+  const [roleCountsDraft, setRoleCountsDraft] = useState({});
+  useEffect(() => { if (Object.keys(roleCountsDraft).length === 0) setRoleCountsDraft({ WARGA: Math.max(0, playerCount - 4), WEREWOLF: 1, GUARDIAN: 1, SEER: 1, WITCH: 1 }); }, [playerCount]);
 
   // Synchronize state to localStorage
   useEffect(() => {
@@ -329,6 +252,7 @@ export default function App() {
     }
     setInputPlayerNames(newNames);
     setNameErrors([]);
+    setRoleCountsDraft(prev => { const total = Object.values(prev).reduce((a,b)=>a+(Number(b)||0),0); return total <= count ? prev : {}; });
   };
 
   const handleNameChange = (index, value) => {
@@ -359,8 +283,12 @@ export default function App() {
       return;
     }
 
-    // Role assignment logic
-    const roleList = getRoleComposition(playerCount);
+    const totalRoles = Object.values(roleCountsDraft).reduce((sum, n) => sum + (Number(n) || 0), 0);
+    if (totalRoles !== playerCount) {
+      triggerToast(`Jumlah role harus tepat ${playerCount}. Saat ini ${totalRoles}.`);
+      return;
+    }
+    const roleList = Object.entries(roleCountsDraft).flatMap(([role, count]) => Array(Number(count)).fill(role));
     const shuffledRoles = shuffle(roleList);
 
     const players = trimmed.map((name, idx) => ({
@@ -380,6 +308,7 @@ export default function App() {
       ...createInitialGameState(),
       players,
       currentPhase: 'ROLE_SUMMARY',
+      roleCounts: { ...roleCountsDraft },
       gameLog: addLog([], 1, 1, 'INFO', `Permainan baru dibuat dengan ${playerCount} pemain.`)
     }));
   };
@@ -468,6 +397,7 @@ export default function App() {
     let targetWerewolf = state.werewolfTargetId;
     let targetGuardian = state.guardianTargetId;
     let witchHeal = state.witchHealUsedThisNight;
+    let witchHealTarget = state.witchHealTargetId;
     let witchKillTarget = state.witchKillTargetId;
 
     let directDeaths = [];
@@ -490,8 +420,10 @@ export default function App() {
     if (targetWerewolf) {
       if (targetWerewolf === targetGuardian) {
         log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${updatedPlayers.find(p => p.id === targetWerewolf)?.name} berhasil digagalkan oleh Guardian.`);
+      } else if (witchHeal && witchHealTarget === targetWerewolf) {
+        log = addLog(log, night, day, 'INFO', `Heal Potion Witch berhasil menyelamatkan korban Werewolf.`);
       } else if (witchHeal) {
-        log = addLog(log, night, day, 'INFO', `Witch menggunakan Heal Potion untuk menyelamatkan ${updatedPlayers.find(p => p.id === targetWerewolf)?.name}.`);
+        log = addLog(log, night, day, 'INFO', `Witch menggunakan Heal Potion, tetapi tebakannya salah.`);
       } else {
         directDeaths.push({ id: targetWerewolf, reason: 'WEREWOLF' });
       }
@@ -576,6 +508,7 @@ export default function App() {
         seerTargetId: null,
         seerResult: null,
         witchHealUsedThisNight: false,
+        witchHealTargetId: null,
         witchKillTargetId: null
       };
     }
@@ -589,24 +522,18 @@ export default function App() {
       seerTargetId: null,
       seerResult: null,
       witchHealUsedThisNight: false,
+      witchHealTargetId: null,
       witchKillTargetId: null
     };
   }
 
   function checkWinConditions(state) {
     const living = state.players.filter(p => p.alive);
-    const livingWerewolves = living.filter(p => p.role === 'WEREWOLF');
-    // Note: Lycan is Team Warga, so Lycan counts as Non-Werewolf!
-    const livingNonWerewolves = living.filter(p => p.role !== 'WEREWOLF');
+    const livingEvil = living.filter(p => EVIL_ROLES.includes(p.role));
+    const livingGood = living.filter(p => !EVIL_ROLES.includes(p.role) && p.role !== 'JESTER' && p.role !== 'DOPPELGANGER');
 
-    if (livingWerewolves.length === 0) {
-      return 'WARGA';
-    }
-
-    if (livingWerewolves.length >= livingNonWerewolves.length) {
-      return 'WEREWOLF';
-    }
-
+    if (livingEvil.length === 0) return 'WARGA';
+    if (livingEvil.length >= livingGood.length) return 'WEREWOLF';
     return null;
   }
 
@@ -855,8 +782,8 @@ export default function App() {
       onConfirm: () => {
         setConfirmModalData(null);
         const playerNames = gameState.players.map(p => p.name);
-        const roleList = getRoleComposition(playerNames.length);
-        const shuffledRoles = shuffle(roleList);
+        const roleList = Object.entries(gameState.roleCounts || {}).flatMap(([role, count]) => Array(Number(count)).fill(role));
+        const shuffledRoles = shuffle(roleList.length === playerNames.length ? roleList : getRoleComposition(playerNames.length));
 
         const newPlayers = playerNames.map((name, idx) => ({
           id: 'player_' + (idx + 1) + '_' + Date.now(),
@@ -1017,7 +944,7 @@ export default function App() {
             </section>
 
             <section className="space-y-3">
-              <h4 className="font-bold text-white text-base">Aturan Peran (7 Role)</h4>
+              <h4 className="font-bold text-white text-base">Aturan Peran</h4>
               {Object.entries(ROLES).map(([key, role]) => (
                 <div key={key} className={`p-3 rounded-xl border ${role.border} ${role.bg} flex items-start gap-3`}>
                   <span className="text-2xl">{role.icon}</span>
@@ -1346,6 +1273,15 @@ export default function App() {
                 {cnt}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Role Quantity Setup */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between"><h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Jumlah Role</h3><span className="text-xs font-bold text-amber-400">{Object.values(roleCountsDraft).reduce((a,b)=>a+(Number(b)||0),0)} / {playerCount}</span></div>
+          <p className="text-xs text-slate-500">Moderator bebas menentukan jumlah setiap role. Total harus sama dengan jumlah pemain.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[45vh] overflow-y-auto pr-1">
+            {ROLE_KEYS.map(roleKey => { const meta=ROLES[roleKey]; const value=Number(roleCountsDraft[roleKey]||0); return <div key={roleKey} className="rounded-xl border border-slate-800 bg-slate-950 p-2.5"><div className="flex items-center gap-2 mb-2"><span>{meta.icon}</span><span className={`text-xs font-bold ${meta.color}`}>{meta.name}</span></div><div className="flex items-center gap-1"><button onClick={()=>setRoleCountsDraft(prev=>({...prev,[roleKey]:Math.max(0,value-1)}))} className="w-8 h-8 rounded-lg bg-slate-800 text-white">−</button><div className="flex-1 text-center font-black text-white">{value}</div><button onClick={()=>setRoleCountsDraft(prev=>({...prev,[roleKey]:Math.min(playerCount,value+1)}))} className="w-8 h-8 rounded-lg bg-slate-800 text-white">+</button></div></div>; })}
           </div>
         </div>
 
@@ -1910,9 +1846,7 @@ export default function App() {
   };
 
   const renderNightWitch = () => {
-    const werewolfTarget = gameState.players.find(p => p.id === gameState.werewolfTargetId);
     const livingTargets = gameState.players.filter(p => p.alive);
-
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
         <div className="text-center space-y-2">
@@ -1920,110 +1854,31 @@ export default function App() {
             <FlaskConical className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold text-purple-400">🧪 WITCH PHASE</h2>
-          <p className="text-sm text-slate-300">
-            Witch, silakan buka mata. Tunjukkan korban Werewolf malam ini dan berikan pilihan penggunaan ramuan.
-          </p>
+          <p className="text-sm text-slate-300">Witch, buka mata. Korban Werewolf TIDAK ditampilkan. Jika memakai Heal, pilih tebakan target secara blind.</p>
         </div>
-
-        {/* Werewolf Victim Display */}
-        <div className="bg-slate-900 border border-purple-900/50 rounded-2xl p-4 text-center space-y-1">
-          <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">Korban Werewolf Malam Ini:</span>
-          <div className="text-xl font-black text-amber-300">
-            {werewolfTarget ? werewolfTarget.name : 'Tidak Ada Target'}
-          </div>
+        <div className="bg-slate-900 border border-purple-900/50 rounded-2xl p-4 text-center">
+          <div className="text-xs font-bold text-purple-300 uppercase tracking-wider">Informasi Korban</div>
+          <div className="text-lg font-black text-slate-300 mt-1">RAHASIA — WITCH TIDAK MELIHAT KORBAN</div>
         </div>
-
-        {/* Potions Control Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Heal Potion Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
-                ❤️ Heal Potion
-              </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                gameState.witchHealUsed ? 'bg-red-950 text-red-400 border border-red-900' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-              }`}>
-                {gameState.witchHealUsed ? 'TERPAKAI' : 'TERSEDIA'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">Menyelamatkan korban Werewolf malam ini.</p>
-            <button
-              disabled={gameState.witchHealUsed || !werewolfTarget || gameState.witchHealUsedThisNight}
-              onClick={() => {
-                setGameState(prev => ({
-                  ...prev,
-                  witchHealUsedThisNight: true,
-                  witchHealUsed: true
-                }));
-                triggerToast(`Heal Potion digunakan untuk menyelamatkan ${werewolfTarget?.name}.`);
-              }}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition ${
-                gameState.witchHealUsedThisNight
-                  ? 'bg-emerald-950 border border-emerald-500 text-emerald-300'
-                  : gameState.witchHealUsed || !werewolfTarget
-                  ? 'bg-slate-950 border border-slate-800 text-slate-600 cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/40'
-              }`}
-            >
-              {gameState.witchHealUsedThisNight ? 'HEAL DIPAKAI' : 'GUNAKAN HEAL'}
-            </button>
+            <div className="flex items-center justify-between"><span className="font-bold text-emerald-400 text-sm">❤️ Heal Potion</span><span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">{gameState.witchHealUsed ? 'TERPAKAI' : 'TERSEDIA'}</span></div>
+            <p className="text-xs text-slate-400">Pilih tebakan pemain yang ingin diselamatkan. Tebakan benar-benar blind.</p>
+            <select disabled={gameState.witchHealUsed} value={gameState.witchHealTargetId || ''} onChange={e => setGameState(prev => ({ ...prev, witchHealTargetId: e.target.value || null, witchHealUsedThisNight: !!e.target.value, witchHealUsed: !!e.target.value }))} className="w-full py-2 px-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none">
+              <option value="">-- Tebak Target Heal --</option>
+              {livingTargets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
-
-          {/* Kill Potion Card */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-purple-400 text-sm flex items-center gap-1.5">
-                ☠️ Kill Potion
-              </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                gameState.witchKillUsed ? 'bg-red-950 text-red-400 border border-red-900' : 'bg-purple-950 text-purple-400 border border-purple-800'
-              }`}>
-                {gameState.witchKillUsed ? 'TERPAKAI' : 'TERSEDIA'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">Membunuh 1 pemain hidup Pilihan Witch.</p>
-
-            {gameState.witchKillTargetId ? (
-              <div className="text-xs text-purple-300 font-bold bg-purple-950 p-2 rounded-xl border border-purple-700 text-center">
-                Target Racun: {gameState.players.find(p => p.id === gameState.witchKillTargetId)?.name}
-              </div>
-            ) : (
-              <select
-                disabled={gameState.witchKillUsed}
-                onChange={(e) => {
-                  const targetId = e.target.value;
-                  if (targetId) {
-                    setGameState(prev => ({
-                      ...prev,
-                      witchKillTargetId: targetId,
-                      witchKillUsed: true
-                    }));
-                    const targetName = gameState.players.find(p => p.id === targetId)?.name;
-                    triggerToast(`Kill Potion digunakan pada ${targetName}.`);
-                  }
-                }}
-                className="w-full py-2 px-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none"
-              >
-                <option value="">-- Pilih Target Kill --</option>
-                {livingTargets.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
+            <div className="flex items-center justify-between"><span className="font-bold text-purple-400 text-sm">☠️ Kill Potion</span><span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-950 text-purple-400 border border-purple-800">{gameState.witchKillUsed ? 'TERPAKAI' : 'TERSEDIA'}</span></div>
+            <p className="text-xs text-slate-400">Membunuh 1 pemain hidup pilihan Witch.</p>
+            <select disabled={gameState.witchKillUsed} value={gameState.witchKillTargetId || ''} onChange={e => { const id=e.target.value||null; setGameState(prev=>({...prev, witchKillTargetId:id, witchKillUsed:!!id})); }} className="w-full py-2 px-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none">
+              <option value="">-- Pilih Target Kill --</option>
+              {livingTargets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
         </div>
-
-        <button
-          onClick={() => {
-            triggerToast('Witch silakan tutup mata.');
-            advanceNightPhase();
-          }}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white font-bold text-base shadow-xl shadow-purple-950/50 flex items-center justify-center gap-2 transition"
-        >
-          <span>SELESAIKAN WITCH & PROSES MALAM</span>
-          <ArrowRight className="w-5 h-5" />
-        </button>
+        <button onClick={() => { triggerToast('Witch silakan tutup mata.'); advanceNightPhase(); }} className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white font-bold text-base shadow-xl shadow-purple-950/50 flex items-center justify-center gap-2 transition"><span>SELESAIKAN WITCH & PROSES MALAM</span><ArrowRight className="w-5 h-5" /></button>
       </div>
     );
   };
