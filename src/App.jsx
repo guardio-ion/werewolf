@@ -45,23 +45,26 @@ const LOCAL_STORAGE_KEY = 'WEREWOLF_MODERATOR_ASSISTANT_STATE_V2';
 const ROLES = {
   WARGA: { name: 'Warga', team: 'Warga', icon: '👨', color: 'text-slate-300', bg: 'bg-slate-800/90', border: 'border-slate-600', accent: 'from-slate-700 to-slate-900', desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi seluruh ancaman.' },
   WEREWOLF: { name: 'Werewolf', team: 'Evil', icon: '🐺', color: 'text-red-400', bg: 'bg-red-950/90', border: 'border-red-600', accent: 'from-red-900 to-red-950', desc: 'Setiap malam memilih 1 korban. Sesama Werewolf saling mengetahui.' },
-  LYCAN: { name: 'Lycan', team: 'Evil', icon: '🌙', color: 'text-slate-200', bg: 'bg-zinc-800/90', border: 'border-zinc-500', accent: 'from-zinc-700 to-zinc-900', desc: 'Berada di tim Evil, tetapi tidak melakukan serangan malam. Seer akan melihatnya sebagai Werewolf.' },
+  LYCAN: { name: 'Lycan', team: 'Warga', icon: '🌙', color: 'text-slate-200', bg: 'bg-zinc-800/90', border: 'border-zinc-500', accent: 'from-zinc-700 to-zinc-900', desc: 'Berada di tim Warga dan tidak memiliki aksi malam. Seer akan melihat Lycan sebagai Werewolf.' },
   CULTIST: { name: 'Cultist', team: 'Evil', icon: '🕯️', color: 'text-fuchsia-400', bg: 'bg-fuchsia-950/90', border: 'border-fuchsia-700', accent: 'from-fuchsia-900 to-fuchsia-950', desc: 'Anggota tim Evil tanpa aksi malam khusus. Tujuannya membantu tim Evil mencapai kemenangan.' },
   SEER: { name: 'Seer', team: 'Warga', icon: '🔮', color: 'text-cyan-400', bg: 'bg-cyan-950/90', border: 'border-cyan-600', accent: 'from-cyan-900 to-cyan-950', desc: 'Setiap malam memeriksa 1 pemain untuk mengetahui wujud/perannya. Lycan terlihat sebagai Werewolf.' },
   GUARDIAN: { name: 'Guardian', team: 'Warga', icon: '🛡️', color: 'text-blue-400', bg: 'bg-blue-950/90', border: 'border-blue-600', accent: 'from-blue-900 to-blue-950', desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak boleh melindungi pemain yang sama dua malam berturut-turut.' },
-  HUNTER: { name: 'Hunter', team: 'Warga', icon: '🏹', color: 'text-orange-400', bg: 'bg-orange-950/90', border: 'border-orange-600', accent: 'from-orange-900 to-orange-950', desc: 'Role Warga tambahan. Tidak memiliki aksi malam aktif dalam spesifikasi saat ini.' },
-  CUPID: { name: 'Cupid', team: 'Warga', icon: '💘', color: 'text-pink-400', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.' },
-  MAYOR: { name: 'Mayor', team: 'Warga', icon: '👑', color: 'text-amber-400', bg: 'bg-amber-950/90', border: 'border-amber-600', accent: 'from-amber-900 to-amber-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
-  SHERIFF: { name: 'Sheriff', team: 'Warga', icon: '⭐', color: 'text-yellow-300', bg: 'bg-yellow-950/90', border: 'border-yellow-600', accent: 'from-yellow-900 to-yellow-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
-  DOCTOR: { name: 'Doctor', team: 'Warga', icon: '⚕️', color: 'text-emerald-400', bg: 'bg-emerald-950/90', border: 'border-emerald-600', accent: 'from-emerald-900 to-emerald-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
-  PRIEST: { name: 'Priest', team: 'Warga', icon: '✝️', color: 'text-violet-300', bg: 'bg-violet-950/90', border: 'border-violet-600', accent: 'from-violet-900 to-violet-950', desc: 'Role Warga tambahan. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' },
+    CUPID: { name: 'Cupid', team: 'Warga', icon: '💘', color: 'text-pink-400', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.' },
+  MAYOR: { name: 'Mayor', team: 'Warga', icon: '👑', color: 'text-amber-400', bg: 'bg-amber-950/90', border: 'border-amber-600', accent: 'from-amber-900 to-amber-950', desc: 'Sekali per game dapat mengungkapkan identitas sebagai Mayor. Setelah terungkap, bobot suaranya menjadi 2 pada voting.' },
+  SHERIFF: { name: 'Sheriff', team: 'Warga', icon: '⭐', color: 'text-yellow-300', bg: 'bg-yellow-950/90', border: 'border-yellow-600', accent: 'from-yellow-900 to-yellow-950', desc: 'Sekali per game, pada malam hari memilih 1 pemain untuk diuji. Jika target adalah Werewolf, target tereliminasi dan Sheriff tetap hidup. Jika target bukan Werewolf, Sheriff ikut tereliminasi.' },
+  DOCTOR: { name: 'Doctor', team: 'Warga', icon: '⚕️', color: 'text-emerald-400', bg: 'bg-emerald-950/90', border: 'border-emerald-600', accent: 'from-emerald-900 to-emerald-950', desc: 'Setiap malam memilih 1 pemain untuk dilindungi dari serangan Werewolf. Tidak menghentikan efek Witch.' },
+  PRIEST: { name: 'Priest', team: 'Warga', icon: '✝️', color: 'text-violet-300', bg: 'bg-violet-950/90', border: 'border-violet-600', accent: 'from-violet-900 to-violet-950', desc: 'Sekali per game pada siang hari dapat memberkati 1 pemain. Pemain tersebut mendapat perlindungan dari serangan Werewolf pada malam berikutnya.' },
   WITCH: { name: 'Witch', team: 'Warga', icon: '🧪', color: 'text-purple-400', bg: 'bg-purple-950/90', border: 'border-purple-600', accent: 'from-purple-900 to-purple-950', desc: 'Memiliki Heal Potion dan Kill Potion, masing-masing hanya 1x. Witch tidak melihat korban Werewolf dan harus menebak target Heal secara blind.' },
-  JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Role Neutral. Mekanik kemenangan khusus belum ditentukan dalam spesifikasi sumber.' },
-  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600', accent: 'from-indigo-900 to-indigo-950', desc: 'Role Neutral. Mekanik khusus belum ditentukan dalam spesifikasi sumber.' }
+  JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Menang sendiri jika berhasil tereliminasi melalui voting siang hari.' },
+  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600', accent: 'from-indigo-900 to-indigo-950', desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger mengambil role target tersebut dan mulai memakai kemampuan role itu.' }
 };
 
 const ROLE_KEYS = Object.keys(ROLES);
-const EVIL_ROLES = ['WEREWOLF', 'LYCAN', 'CULTIST'];
+const EVIL_ROLES = ['WEREWOLF', 'CULTIST'];
+
+function isWolfAligned(player) {
+  return player?.role === 'WEREWOLF' || player?.role === 'CULTIST';
+}
 
 function getRoleComposition(playerCount) {
   const wolves = Math.max(1, Math.floor(playerCount / 4));
@@ -85,7 +88,7 @@ function shuffle(array) {
 function createInitialGameState() {
   return {
     players: [],
-    currentPhase: 'HOME', // HOME | RULES | SETUP | ROLE_SUMMARY | ROLE_REVEAL | NIGHT_INTRO | NIGHT_CUPID | NIGHT_WEREWOLF | NIGHT_GUARDIAN | NIGHT_SEER | NIGHT_WITCH | MORNING | DISCUSSION | VOTING | GAME_OVER
+    currentPhase: 'HOME', // HOME | RULES | SETUP | ROLE_SUMMARY | ROLE_REVEAL | NIGHT_INTRO | NIGHT_CUPID | NIGHT_WEREWOLF | NIGHT_GUARDIAN | NIGHT_DOCTOR | NIGHT_SHERIFF | NIGHT_DOPPELGANGER | NIGHT_SEER | NIGHT_WITCH | MORNING | DISCUSSION | VOTING | GAME_OVER
     nightNumber: 1,
     dayNumber: 1,
     
@@ -98,6 +101,15 @@ function createInitialGameState() {
     // Night action buffers
     werewolfTargetId: null,
     guardianTargetId: null,
+    doctorTargetId: null,
+    sheriffTargetId: null,
+    sheriffUsed: false,
+    priestTargetId: null,
+    priestUsed: false,
+    priestBlessedId: null,
+    doppelgangerTargetId: null,
+    doppelgangerCopied: false,
+    mayorRevealed: false,
     seerTargetId: null,
     seerResult: null,
     witchHealUsedThisNight: false,
@@ -127,7 +139,7 @@ function createInitialGameState() {
     lastDayDeaths: [],
     loverDeathNotice: [],
     roleCounts: {},
-    winner: null, // "WARGA" | "WEREWOLF"
+    winner: null, // "WARGA" | "WEREWOLF" | "JESTER"
 
     // Undo Snapshot
     undoStack: []
@@ -140,7 +152,11 @@ export default function App() {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.currentPhase) return parsed;
+        if (parsed && parsed.currentPhase) return {
+          ...createInitialGameState(),
+          ...parsed,
+          players: (parsed.players || []).map(p => ({ ...p, protectedLastNight: !!p.protectedLastNight, protectedThisNight: !!p.protectedThisNight, doctorProtectedThisNight: !!p.doctorProtectedThisNight, priestProtectedThisNight: !!p.priestProtectedThisNight, doppelgangerCopied: !!p.doppelgangerCopied }))
+        };
       }
     } catch (e) {
       console.error("Gagal memuat state dari localStorage:", e);
@@ -299,6 +315,8 @@ export default function App() {
       loverId: null,
       protectedLastNight: false,
       protectedThisNight: false,
+      doctorProtectedThisNight: false,
+      priestProtectedThisNight: false,
       deathReason: null,
       deathNight: null,
       deathDay: null
@@ -352,38 +370,47 @@ export default function App() {
   const advanceNightPhase = () => {
     setGameState(prev => {
       const { nightNumber, players, cupidUsed } = prev;
+      const canContinueFrom = (...phases) => phases.includes(prev.currentPhase);
 
-      // 1. Check Cupid (Night 1 only, if Cupid alive & not used)
-      const cupidPlayer = players.find(p => p.role === 'CUPID' && p.alive);
-      if (nightNumber === 1 && cupidPlayer && !cupidUsed && prev.currentPhase === 'NIGHT_INTRO') {
+      if (nightNumber === 1 && players.some(p => p.role === 'CUPID' && p.alive) && !cupidUsed && prev.currentPhase === 'NIGHT_INTRO') {
         return { ...prev, currentPhase: 'NIGHT_CUPID' };
       }
 
-      // 2. Werewolf Phase
       const livingWerewolves = players.filter(p => p.role === 'WEREWOLF' && p.alive);
-      if (livingWerewolves.length > 0 && (prev.currentPhase === 'NIGHT_INTRO' || prev.currentPhase === 'NIGHT_CUPID')) {
+      if (livingWerewolves.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID')) {
         return { ...prev, currentPhase: 'NIGHT_WEREWOLF' };
       }
 
-      // 3. Guardian Phase
       const guardian = players.find(p => p.role === 'GUARDIAN' && p.alive);
-      if (guardian && (prev.currentPhase === 'NIGHT_INTRO' || prev.currentPhase === 'NIGHT_CUPID' || prev.currentPhase === 'NIGHT_WEREWOLF')) {
+      if (guardian && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
         return { ...prev, currentPhase: 'NIGHT_GUARDIAN' };
       }
 
-      // 4. Seer Phase
+      const doctor = players.find(p => p.role === 'DOCTOR' && p.alive);
+      if (doctor && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
+        return { ...prev, currentPhase: 'NIGHT_DOCTOR' };
+      }
+
+      const sheriff = players.find(p => p.role === 'SHERIFF' && p.alive);
+      if (sheriff && !prev.sheriffUsed && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_DOCTOR')) {
+        return { ...prev, currentPhase: 'NIGHT_SHERIFF' };
+      }
+
+      const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
+      if (doppel && nightNumber === 1 && !prev.doppelgangerTargetId && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_DOCTOR', 'NIGHT_SHERIFF')) {
+        return { ...prev, currentPhase: 'NIGHT_DOPPELGANGER' };
+      }
+
       const seer = players.find(p => p.role === 'SEER' && p.alive);
-      if (seer && (prev.currentPhase === 'NIGHT_INTRO' || prev.currentPhase === 'NIGHT_CUPID' || prev.currentPhase === 'NIGHT_WEREWOLF' || prev.currentPhase === 'NIGHT_GUARDIAN')) {
+      if (seer && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_DOCTOR', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER')) {
         return { ...prev, currentPhase: 'NIGHT_SEER' };
       }
 
-      // 5. Witch Phase
       const witch = players.find(p => p.role === 'WITCH' && p.alive);
-      if (witch && (!prev.witchHealUsed || !prev.witchKillUsed) && (prev.currentPhase === 'NIGHT_INTRO' || prev.currentPhase === 'NIGHT_CUPID' || prev.currentPhase === 'NIGHT_WEREWOLF' || prev.currentPhase === 'NIGHT_GUARDIAN' || prev.currentPhase === 'NIGHT_SEER')) {
+      if (witch && (!prev.witchHealUsed || !prev.witchKillUsed) && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_DOCTOR', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
         return { ...prev, currentPhase: 'NIGHT_WITCH' };
       }
 
-      // If all steps completed, resolve night
       return resolveNightActions(prev);
     });
   };
@@ -394,143 +421,152 @@ export default function App() {
     const night = state.nightNumber;
     const day = state.dayNumber;
 
-    let targetWerewolf = state.werewolfTargetId;
-    let targetGuardian = state.guardianTargetId;
-    let witchHeal = state.witchHealUsedThisNight;
-    let witchHealTarget = state.witchHealTargetId;
-    let witchKillTarget = state.witchKillTargetId;
+    const targetWerewolf = state.werewolfTargetId;
+    const targetGuardian = state.guardianTargetId;
+    const targetDoctor = state.doctorTargetId;
+    const sheriffTarget = state.sheriffTargetId;
+    const witchHeal = state.witchHealUsedThisNight;
+    const witchHealTarget = state.witchHealTargetId;
+    const witchKillTarget = state.witchKillTargetId;
+    const priestBlessedId = state.priestBlessedId;
 
-    let directDeaths = [];
+    const directDeaths = [];
+    const protectedByTown = new Set([targetGuardian, targetDoctor, priestBlessedId].filter(Boolean));
 
-    // Log Werewolf Choice
     if (targetWerewolf) {
       const victimName = updatedPlayers.find(p => p.id === targetWerewolf)?.name;
       log = addLog(log, night, day, 'ACTION', `Werewolf mengincar ${victimName}.`);
-    } else {
-      log = addLog(log, night, day, 'ACTION', `Werewolf tidak memilih target malam ini.`);
     }
-
-    // Log Guardian Protection
     if (targetGuardian) {
-      const protectedName = updatedPlayers.find(p => p.id === targetGuardian)?.name;
-      log = addLog(log, night, day, 'ACTION', `Guardian melindungi ${protectedName}.`);
+      const name = updatedPlayers.find(p => p.id === targetGuardian)?.name;
+      log = addLog(log, night, day, 'ACTION', `Guardian melindungi ${name}.`);
+    }
+    if (targetDoctor) {
+      const name = updatedPlayers.find(p => p.id === targetDoctor)?.name;
+      log = addLog(log, night, day, 'ACTION', `Doctor melindungi ${name}.`);
     }
 
-    // Process Werewolf Victim
     if (targetWerewolf) {
-      if (targetWerewolf === targetGuardian) {
-        log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${updatedPlayers.find(p => p.id === targetWerewolf)?.name} berhasil digagalkan oleh Guardian.`);
+      if (protectedByTown.has(targetWerewolf)) {
+        log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${updatedPlayers.find(p => p.id === targetWerewolf)?.name} berhasil dicegah.`);
       } else if (witchHeal && witchHealTarget === targetWerewolf) {
         log = addLog(log, night, day, 'INFO', `Heal Potion Witch berhasil menyelamatkan korban Werewolf.`);
       } else if (witchHeal) {
         log = addLog(log, night, day, 'INFO', `Witch menggunakan Heal Potion, tetapi tebakannya salah.`);
+        directDeaths.push({ id: targetWerewolf, reason: 'WEREWOLF' });
       } else {
         directDeaths.push({ id: targetWerewolf, reason: 'WEREWOLF' });
       }
     }
 
-    // Process Witch Kill Target (Guardian CANNOT stop Witch kill)
-    if (witchKillTarget) {
-      const killedName = updatedPlayers.find(p => p.id === witchKillTarget)?.name;
-      log = addLog(log, night, day, 'ACTION', `Witch menggunakan Kill Potion pada ${killedName}.`);
-      directDeaths.push({ id: witchKillTarget, reason: 'WITCH' });
-    }
-
-    // Apply direct deaths
-    let newDeathsMap = new Map(); // playerId -> reason
-    directDeaths.forEach(d => newDeathsMap.set(d.id, d.reason));
-    const loverDeathNotice = [];
-
-    // Recursive Lovers Chain Resolution
-    let loversChainResolved = false;
-    while (!loversChainResolved) {
-      loversChainResolved = true;
-      const currentDeadIds = Array.from(newDeathsMap.keys());
-
-      for (const deadId of currentDeadIds) {
-        const deadPlayer = updatedPlayers.find(p => p.id === deadId);
-        if (deadPlayer && deadPlayer.loverId) {
-          const partnerId = deadPlayer.loverId;
-          const partner = updatedPlayers.find(p => p.id === partnerId);
-          if (partner && partner.alive && !newDeathsMap.has(partnerId)) {
-            newDeathsMap.set(partnerId, 'LOVER');
-            loverDeathNotice.push({
-              id: `lover_${partner.id}_${night}_${day}`,
-              name: partner.name,
-              partnerName: deadPlayer.name
-            });
-            log = addLog(log, night, day, 'DEATH', `💔 ${partner.name} ikut meninggal karena pasangan ${deadPlayer.name} mati.`);
-            loversChainResolved = false; // repeat check for chain reactions
-          }
+    // Sheriff test: only an actual WEREWOLF is a correct target. Lycan/Cultist are not Werewolf.
+    if (sheriffTarget) {
+      const sheriff = updatedPlayers.find(p => p.role === 'SHERIFF' && p.alive);
+      const target = updatedPlayers.find(p => p.id === sheriffTarget && p.alive);
+      if (sheriff && target) {
+        if (target.role === 'WEREWOLF') {
+          directDeaths.push({ id: target.id, reason: 'SHERIFF' });
+          log = addLog(log, night, day, 'ACTION', `Sheriff berhasil menemukan Werewolf: ${target.name}.`);
+        } else {
+          directDeaths.push({ id: sheriff.id, reason: 'SHERIFF_MISS' });
+          log = addLog(log, night, day, 'ACTION', `Sheriff salah memilih target dan tereliminasi.`);
         }
       }
     }
 
-    // Mark players dead in state
+    if (witchKillTarget) {
+      const killedName = updatedPlayers.find(p => p.id === witchKillTarget)?.name;
+      if (killedName) {
+        log = addLog(log, night, day, 'ACTION', `Witch menggunakan Kill Potion pada ${killedName}.`);
+        directDeaths.push({ id: witchKillTarget, reason: 'WITCH' });
+      }
+    }
+
+    const newDeathsMap = new Map();
+    directDeaths.forEach(d => newDeathsMap.set(d.id, d.reason));
+    const loverDeathNotice = [];
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const currentDeadIds = Array.from(newDeathsMap.keys());
+      for (const deadId of currentDeadIds) {
+        const deadPlayer = updatedPlayers.find(p => p.id === deadId);
+        if (!deadPlayer) continue;
+        const partnerId = deadPlayer.loverId;
+        const partner = partnerId ? updatedPlayers.find(p => p.id === partnerId) : null;
+        if (partner && partner.alive && !newDeathsMap.has(partnerId)) {
+          newDeathsMap.set(partnerId, 'LOVER');
+          loverDeathNotice.push({ id: `lover_${partner.id}_${night}_${day}`, name: partner.name, partnerName: deadPlayer.name });
+          log = addLog(log, night, day, 'DEATH', `💔 ${partner.name} ikut tereliminasi karena pasangan ${deadPlayer.name} tereliminasi.`);
+          changed = true;
+        }
+      }
+    }
+
     const nightDeathsList = [];
     newDeathsMap.forEach((reason, deadId) => {
       const idx = updatedPlayers.findIndex(p => p.id === deadId);
-      if (idx !== -1) {
-        updatedPlayers[idx].alive = false;
-        updatedPlayers[idx].deathReason = reason;
-        updatedPlayers[idx].deathNight = night;
-        nightDeathsList.push({ player: updatedPlayers[idx], reason });
-        log = addLog(log, night, day, 'DEATH', `${updatedPlayers[idx].name} tereliminasi (${reason === 'WEREWOLF' ? 'Diserang Werewolf' : reason === 'WITCH' ? 'Racun Witch' : 'Mati Pasangan Lovers'}).`);
-      }
+      if (idx === -1) return;
+      updatedPlayers[idx].alive = false;
+      updatedPlayers[idx].deathReason = reason;
+      updatedPlayers[idx].deathNight = night;
+      nightDeathsList.push({ player: updatedPlayers[idx], reason });
+      const label = reason === 'WEREWOLF' ? 'Diserang Werewolf' : reason === 'WITCH' ? 'Racun Witch' : reason === 'SHERIFF' ? 'Eliminasi Sheriff' : reason === 'SHERIFF_MISS' ? 'Salah memilih target Sheriff' : 'Efek Lovers';
+      log = addLog(log, night, day, 'DEATH', `${updatedPlayers[idx].name} tereliminasi (${label}).`);
     });
 
-    // Reset Guardian protection states for next night
     updatedPlayers = updatedPlayers.map(p => ({
       ...p,
       protectedLastNight: p.id === targetGuardian,
-      protectedThisNight: false
+      protectedThisNight: false,
+      doctorProtectedThisNight: false,
+      priestProtectedThisNight: false
     }));
 
-    // Check Victory
+    // Doppelganger copies a target's role when that target dies.
+    const doppel = updatedPlayers.find(p => p.role === 'DOPPELGANGER' && p.alive && p.doppelgangerTargetId);
+    if (doppel && !doppel.doppelgangerCopied) {
+      const target = updatedPlayers.find(p => p.id === doppel.doppelgangerTargetId);
+      if (target && !target.alive) {
+        const idx = updatedPlayers.findIndex(p => p.id === doppel.id);
+        updatedPlayers[idx] = { ...updatedPlayers[idx], role: target.role, doppelgangerCopied: true };
+        log = addLog(log, night, day, 'ACTION', `Doppelganger menyalin role ${ROLES[target.role]?.name || target.role} dari ${target.name}.`);
+      }
+    }
+
     const tempState = {
       ...state,
       players: updatedPlayers,
       gameLog: log,
       lastNightDeaths: nightDeathsList,
-      loverDeathNotice
-    };
-
-    const winResult = checkWinConditions(tempState);
-    if (winResult) {
-      log = addLog(log, night, day, 'WIN', winResult === 'WARGA' ? 'Kemenangan Tim WARGA!' : 'Kemenangan Tim WEREWOLF!');
-      return {
-        ...tempState,
-        currentPhase: 'GAME_OVER',
-        winner: winResult,
-        gameLog: log,
-        werewolfTargetId: null,
-        guardianTargetId: null,
-        seerTargetId: null,
-        seerResult: null,
-        witchHealUsedThisNight: false,
-        witchHealTargetId: null,
-        witchKillTargetId: null
-      };
-    }
-
-    return {
-      ...tempState,
-      currentPhase: 'MORNING',
-      gameLog: log,
+      loverDeathNotice,
       werewolfTargetId: null,
       guardianTargetId: null,
+      doctorTargetId: null,
+      sheriffTargetId: null,
       seerTargetId: null,
       seerResult: null,
       witchHealUsedThisNight: false,
       witchHealTargetId: null,
-      witchKillTargetId: null
+      witchKillTargetId: null,
+      priestBlessedId: null
     };
+
+    const winResult = checkWinConditions(tempState);
+    if (winResult) {
+      const winText = winResult === 'WARGA' ? 'Kemenangan Tim WARGA!' : winResult === 'WEREWOLF' ? 'Kemenangan Tim WEREWOLF!' : 'JESTER memenangkan permainan!';
+      log = addLog(log, night, day, 'WIN', winText);
+      return { ...tempState, currentPhase: 'GAME_OVER', winner: winResult, gameLog: log };
+    }
+
+    return { ...tempState, currentPhase: 'MORNING', gameLog: log };
   }
 
   function checkWinConditions(state) {
     const living = state.players.filter(p => p.alive);
-    const livingEvil = living.filter(p => EVIL_ROLES.includes(p.role));
-    const livingGood = living.filter(p => !EVIL_ROLES.includes(p.role) && p.role !== 'JESTER' && p.role !== 'DOPPELGANGER');
+    const livingEvil = living.filter(isWolfAligned);
+    const livingGood = living.filter(p => !isWolfAligned(p) && p.role !== 'JESTER');
 
     if (livingEvil.length === 0) return 'WARGA';
     if (livingEvil.length >= livingGood.length) return 'WEREWOLF';
@@ -591,6 +627,53 @@ export default function App() {
     advanceNightPhase();
   };
 
+  const handleConfirmDoppelganger = () => {
+    const targetId = gameState.doppelgangerTargetId;
+    const target = gameState.players.find(p => p.id === targetId && p.alive && p.role !== 'DOPPELGANGER');
+    if (!target) { triggerToast('Pilih satu target hidup untuk Doppelganger.'); return; }
+    setGameState(prev => ({
+      ...prev,
+      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Doppelganger memilih ${target.name} sebagai target.`)
+    }));
+    advanceNightPhase();
+  };
+
+  const handleConfirmSheriff = () => {
+    if (!gameState.sheriffTargetId) { triggerToast('Pilih target Sheriff terlebih dahulu.'); return; }
+    setGameState(prev => ({
+      ...prev,
+      sheriffUsed: true,
+      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Sheriff menggunakan kemampuan malam pada pemain terpilih.`)
+    }));
+    triggerToast('Aksi Sheriff dikonfirmasi. Sheriff silakan tutup mata.');
+    advanceNightPhase();
+  };
+
+  const handlePriestBless = (targetId) => {
+    const priest = gameState.players.find(p => p.role === 'PRIEST' && p.alive);
+    const target = gameState.players.find(p => p.id === targetId && p.alive);
+    if (!priest || gameState.priestUsed || !target) return;
+    setGameState(prev => ({
+      ...prev,
+      priestUsed: true,
+      priestTargetId: targetId,
+      priestBlessedId: targetId,
+      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Priest memberkati ${target.name}. Perlindungan berlaku untuk malam berikutnya.`)
+    }));
+    triggerToast(`${target.name} mendapat berkat Priest untuk malam berikutnya.`);
+  };
+
+  const handleMayorReveal = () => {
+    const mayor = gameState.players.find(p => p.role === 'MAYOR' && p.alive);
+    if (!mayor || gameState.mayorRevealed) return;
+    setGameState(prev => ({
+      ...prev,
+      mayorRevealed: true,
+      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkapkan identitas. Mulai sekarang bobot suaranya menjadi 2.`)
+    }));
+    triggerToast(`${mayor.name} sekarang memiliki 2 suara dalam voting.`);
+  };
+
   const handleVoteSubmit = (voterId, targetId) => {
     setGameState(prev => {
       const newVotes = { ...prev.votes, [voterId]: targetId };
@@ -612,8 +695,11 @@ export default function App() {
 
     // Calculate vote count per living candidate
     const voteCounts = {};
-    Object.values(votes).forEach(targetId => {
-      voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
+    Object.entries(votes).forEach(([voterId, targetId]) => {
+      const voter = players.find(p => p.id === voterId && p.alive);
+      if (!voter) return;
+      const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1;
+      voteCounts[targetId] = (voteCounts[targetId] || 0) + weight;
     });
 
     let maxVotes = 0;
@@ -673,6 +759,22 @@ export default function App() {
           dayDeaths.push({ player: updatedPlayers[idx], reason });
         }
       });
+
+      const eliminatedWasJester = eliminatedPlayer?.role === 'JESTER';
+      if (eliminatedWasJester) {
+        log = addLog(log, nightNumber, dayNumber, 'WIN', `Jester ${eliminatedPlayer.name} berhasil tereliminasi lewat voting dan menang!`);
+        const jesterState = {
+          ...gameState,
+          players: updatedPlayers,
+          gameLog: log,
+          lastDayDeaths: dayDeaths,
+          loverDeathNotice,
+          currentPhase: 'GAME_OVER',
+          winner: 'JESTER'
+        };
+        setGameState(jesterState);
+        return;
+      }
     } else {
       // Tie vote
       log = addLog(log, nightNumber, dayNumber, 'INFO', `Hasil voting seri! Tidak ada pemain yang tereliminasi.`);
@@ -939,8 +1041,8 @@ export default function App() {
               <h4 className="font-bold text-amber-300 text-base flex items-center gap-2">
                 <Crown className="w-4 h-4" /> Tujuan Permainan
               </h4>
-              <p>• <strong>Tim Warga:</strong> Eliminasi seluruh Werewolf dari desa melalui diskusi dan voting.</p>
-              <p>• <strong>Tim Werewolf:</strong> Kurangi jumlah Warga hingga jumlah Werewolf sama dengan atau melebihi sisa Warga hidup.</p>
+              <p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil (Werewolf dan Cultist) dari desa.</p>
+              <p>• <strong>Tim Werewolf:</strong> Jumlah role Evil yang hidup mencapai atau melebihi jumlah pemain non-Evil yang hidup.</p>
             </section>
 
             <section className="space-y-3">
@@ -968,6 +1070,9 @@ export default function App() {
                 <li><strong>Cupid</strong> (Hanya Malam 1) — Memilih 2 Lovers.</li>
                 <li><strong>Werewolf</strong> — Memilih 1 target mangsa.</li>
                 <li><strong>Guardian</strong> — Memilih 1 pemain untuk dilindungi.</li>
+                <li><strong>Doctor</strong> — Memilih 1 pemain untuk dilindungi.</li>
+                <li><strong>Sheriff</strong> — 1x memilih target; hanya Werewolf adalah target benar.</li>
+                <li><strong>Doppelganger</strong> — Malam 1 memilih target.</li>
                 <li><strong>Seer</strong> — Meramal 1 peran pemain.</li>
                 <li><strong>Witch</strong> — Memilih Heal korban Werewolf atau Kill pemain lain.</li>
               </ol>
@@ -1095,6 +1200,9 @@ export default function App() {
       case 'NIGHT_CUPID':
       case 'NIGHT_WEREWOLF':
       case 'NIGHT_GUARDIAN':
+      case 'NIGHT_DOCTOR':
+      case 'NIGHT_SHERIFF':
+      case 'NIGHT_DOPPELGANGER':
       case 'NIGHT_SEER':
       case 'NIGHT_WITCH':
         phaseBadge = `MALAM ${gameState.nightNumber}`;
@@ -1511,6 +1619,9 @@ export default function App() {
             )}
             {gameState.players.some(p => p.role === 'WEREWOLF' && p.alive) && <li>Werewolf memilih korban</li>}
             {gameState.players.some(p => p.role === 'GUARDIAN' && p.alive) && <li>Guardian melindungi 1 pemain</li>}
+            {gameState.players.some(p => p.role === 'DOCTOR' && p.alive) && <li>Doctor melindungi 1 pemain</li>}
+            {gameState.players.some(p => p.role === 'SHERIFF' && p.alive && !gameState.sheriffUsed) && <li>Sheriff memilih 1 target (1x per game)</li>}
+            {gameState.nightNumber === 1 && gameState.players.some(p => p.role === 'DOPPELGANGER' && p.alive && !gameState.doppelgangerTargetId) && <li>Doppelganger memilih target</li>}
             {gameState.players.some(p => p.role === 'SEER' && p.alive) && <li>Seer meramal 1 pemain</li>}
             {gameState.players.some(p => p.role === 'WITCH' && p.alive) && <li>Witch memutuskan potion</li>}
           </ul>
@@ -1781,6 +1892,51 @@ export default function App() {
     );
   };
 
+  const renderNightDoctor = () => {
+    const livingPlayers = gameState.players.filter(p => p.alive);
+    const selected = gameState.players.find(p => p.id === gameState.doctorTargetId);
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-emerald-950 border border-emerald-700 text-emerald-400"><span className="text-3xl">⚕️</span></div><h2 className="text-2xl font-bold text-emerald-400">DOCTOR PHASE</h2><p className="text-sm text-slate-300">Doctor memilih 1 pemain hidup untuk dilindungi dari serangan Werewolf malam ini.</p></div>
+        {selected && <div className="bg-emerald-950/80 border border-emerald-700 rounded-2xl p-4 text-center"><span className="text-xs font-bold text-emerald-300">TARGET PERLINDUNGAN</span><div className="text-xl font-black text-white mt-1">{selected.name}</div></div>}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
+          {livingPlayers.map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, doctorTargetId: p.id }))} className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.doctorTargetId === p.id ? 'bg-emerald-950 border-emerald-500 text-emerald-200' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
+        </div>
+        <button onClick={() => { if (!gameState.doctorTargetId) return triggerToast('Pilih target Doctor.'); triggerToast('Doctor selesai.'); advanceNightPhase(); }} className="w-full py-4 rounded-2xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold flex items-center justify-center gap-2"><span>KONFIRMASI DOCTOR</span><ArrowRight className="w-5 h-5" /></button>
+      </div>
+    );
+  };
+
+  const renderNightSheriff = () => {
+    const sheriff = gameState.players.find(p => p.role === 'SHERIFF' && p.alive);
+    const candidates = gameState.players.filter(p => p.alive && p.id !== sheriff?.id);
+    const selected = gameState.players.find(p => p.id === gameState.sheriffTargetId);
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-yellow-950 border border-yellow-700 text-yellow-300"><Award className="w-8 h-8" /></div><h2 className="text-2xl font-bold text-yellow-300">⭐ SHERIFF PHASE</h2><p className="text-sm text-slate-300">Sekali per game, Sheriff memilih 1 pemain. Jika target adalah Werewolf, target tereliminasi dan Sheriff selamat. Jika target bukan Werewolf, Sheriff tereliminasi.</p></div>
+        <div className="bg-yellow-950/50 border border-yellow-800 rounded-2xl p-4 text-center text-xs text-yellow-200">Lycan dan Cultist <strong>bukan</strong> target benar. Hanya role Werewolf yang dianggap jawaban benar.</div>
+        {selected && <div className="bg-slate-900 border border-yellow-700 rounded-2xl p-4 text-center"><span className="text-xs font-bold text-yellow-300">TARGET TERPILIH</span><div className="text-xl font-black text-white mt-1">{selected.name}</div></div>}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
+          {candidates.map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, sheriffTargetId: p.id }))} className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950 border-yellow-500 text-yellow-200' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
+        </div>
+        <button onClick={handleConfirmSheriff} className="w-full py-4 rounded-2xl bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black flex items-center justify-center gap-2"><span>KONFIRMASI AKSI SHERIFF</span><ArrowRight className="w-5 h-5" /></button>
+      </div>
+    );
+  };
+
+  const renderNightDoppelganger = () => {
+    const livingPlayers = gameState.players.filter(p => p.alive && p.role !== 'DOPPELGANGER');
+    const selected = gameState.players.find(p => p.id === gameState.doppelgangerTargetId);
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950 border border-indigo-700 text-indigo-300"><span className="text-3xl">🎭</span></div><h2 className="text-2xl font-bold text-indigo-300">DOPPELGANGER PHASE</h2><p className="text-sm text-slate-300">Malam 1: pilih 1 target hidup. Jika target mati, Doppelganger mengambil role target tersebut.</p></div>
+        {selected && <div className="bg-indigo-950/70 border border-indigo-700 rounded-2xl p-4 text-center"><span className="text-xs font-bold text-indigo-300">TARGET DOPPELGANGER</span><div className="text-xl font-black text-white mt-1">{selected.name}</div></div>}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">{livingPlayers.map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, doppelgangerTargetId: p.id }))} className={`p-3 rounded-xl border text-sm font-bold text-left ${gameState.doppelgangerTargetId === p.id ? 'bg-indigo-950 border-indigo-500 text-indigo-200' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}</div>
+        <button onClick={handleConfirmDoppelganger} className="w-full py-4 rounded-2xl bg-indigo-700 hover:bg-indigo-600 text-white font-bold flex items-center justify-center gap-2"><span>KONFIRMASI TARGET DOPPELGANGER</span><ArrowRight className="w-5 h-5" /></button>
+      </div>
+    );
+  };
+
   const renderNightSeer = () => {
     const livingPlayers = gameState.players.filter(p => p.alive && p.role !== 'SEER');
     const result = gameState.seerResult;
@@ -1913,7 +2069,7 @@ export default function App() {
                   <div key={player.id} className="p-3 bg-red-950/60 border border-red-800 rounded-2xl flex items-center justify-between">
                     <span className="font-extrabold text-white text-base">{player.name}</span>
                     <span className="text-xs px-2.5 py-1 rounded-full bg-red-900 text-red-200 font-semibold">
-                      {reason === 'WEREWOLF' ? 'Serangan Werewolf' : reason === 'WITCH' ? 'Racun Witch' : 'Efek Lovers'}
+                      {reason === 'WEREWOLF' ? 'Serangan Werewolf' : reason === 'WITCH' ? 'Racun Witch' : reason === 'SHERIFF' ? 'Eliminasi Sheriff' : reason === 'SHERIFF_MISS' ? 'Salah memilih target Sheriff' : 'Efek Lovers'}
                     </span>
                   </div>
                 ))}
@@ -1953,6 +2109,21 @@ export default function App() {
             Pemain mendiskusikan petunjuk dan dugaan untuk menentukan siapa yang akan divote.
           </p>
         </div>
+
+        {gameState.players.some(p => p.role === 'PRIEST' && p.alive) && (
+          <div className="bg-violet-950/50 border border-violet-800 rounded-2xl p-4 text-left space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-violet-300">✝️ Priest</span>
+              <span className="text-[10px] px-2 py-1 rounded-full border border-violet-700 bg-violet-950 text-violet-300 font-bold">{gameState.priestUsed ? 'TERPAKAI' : '1x TERSEDIA'}</span>
+            </div>
+            <p className="text-xs text-slate-300">Sekali per game, pilih 1 pemain hidup untuk diberkati. Target terlindungi dari serangan Werewolf pada malam berikutnya.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {gameState.players.filter(p => p.alive).map(p => (
+                <button key={p.id} disabled={gameState.priestUsed} onClick={() => handlePriestBless(p.id)} className={`p-2 rounded-xl border text-xs font-bold ${gameState.priestTargetId === p.id ? 'bg-violet-900 border-violet-500 text-violet-100' : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900'} ${gameState.priestUsed ? 'opacity-60 cursor-not-allowed' : ''}`}>{p.name}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Big Countdown Timer */}
         <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 space-y-4 shadow-2xl">
@@ -2002,6 +2173,7 @@ export default function App() {
   };
 
   const renderVoting = () => {
+    const livingMayor = gameState.players.find(p => p.role === 'MAYOR' && p.alive);
     const livingPlayers = gameState.players.filter(p => p.alive);
     const { currentVoterIndex, votes } = gameState;
     const currentVoter = livingPlayers[currentVoterIndex];
@@ -2010,8 +2182,11 @@ export default function App() {
 
     // Tally vote counts for preview
     const voteTally = {};
-    Object.values(votes).forEach(targetId => {
-      voteTally[targetId] = (voteTally[targetId] || 0) + 1;
+    Object.entries(votes).forEach(([voterId, targetId]) => {
+      const voter = gameState.players.find(p => p.id === voterId && p.alive);
+      if (!voter) return;
+      const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1;
+      voteTally[targetId] = (voteTally[targetId] || 0) + weight;
     });
 
     return (
@@ -2024,6 +2199,11 @@ export default function App() {
           <p className="text-xs text-slate-400">
             Setiap pemain hidup memberikan 1 suara untuk mengeliminasi terduga Werewolf.
           </p>
+        </div>
+
+        <div className="space-y-2">
+          {livingMayor && !gameState.mayorRevealed && <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm">👑 UNGKAP IDENTITAS MAYOR</button>}
+          {gameState.mayorRevealed && livingMayor && <div className="bg-amber-950/50 border border-amber-800 rounded-2xl p-3 text-center text-xs text-amber-200">👑 Mayor <strong>{livingMayor.name}</strong> aktif. Suara Mayor bernilai 2.</div>}
         </div>
 
         {!isAllVotesDone && currentVoter ? (
@@ -2081,22 +2261,25 @@ export default function App() {
 
   const renderGameOver = () => {
     const isWargaWin = gameState.winner === 'WARGA';
+    const isJesterWin = gameState.winner === 'JESTER';
 
     return (
       <div className="max-w-xl mx-auto p-4 sm:p-6 text-center space-y-6">
         <div className="space-y-4 pt-4">
           <div className={`inline-flex items-center justify-center p-5 rounded-3xl border shadow-2xl ${
-            isWargaWin ? 'bg-emerald-950 border-emerald-600 text-emerald-400' : 'bg-red-950 border-red-600 text-red-400'
+            isWargaWin ? 'bg-emerald-950 border-emerald-600 text-emerald-400' : isJesterWin ? 'bg-pink-950 border-pink-600 text-pink-400' : 'bg-red-950 border-red-600 text-red-400'
           }`}>
             <Crown className="w-16 h-16 animate-bounce" />
           </div>
-          <h2 className={`text-3xl font-black uppercase tracking-wider ${isWargaWin ? 'text-emerald-400' : 'text-red-400'}`}>
-            {isWargaWin ? '🏆 TIM WARGA MENANG' : '🐺 TIM WEREWOLF MENANG'}
+          <h2 className={`text-3xl font-black uppercase tracking-wider ${isWargaWin ? 'text-emerald-400' : isJesterWin ? 'text-pink-400' : 'text-red-400'}`}>
+            {isWargaWin ? '🏆 TIM WARGA MENANG' : isJesterWin ? '🃏 JESTER MENANG' : '🐺 TIM WEREWOLF MENANG'}
           </h2>
           <p className="text-xs text-slate-300">
             {isWargaWin
-              ? 'Seluruh Werewolf berhasil dieliminasi dari desa!'
-              : 'Jumlah Werewolf telah menyamai atau melebihi sisa Warga desa!'}
+              ? 'Seluruh role Evil berhasil dieliminasi dari desa!'
+              : isJesterWin
+              ? 'Jester berhasil tereliminasi melalui voting siang hari dan memenangkan permainan!'
+              : 'Jumlah role Evil telah menyamai atau melebihi pemain non-Evil yang hidup!'}
           </p>
         </div>
 
@@ -2166,6 +2349,12 @@ export default function App() {
         return renderNightWerewolf();
       case 'NIGHT_GUARDIAN':
         return renderNightGuardian();
+      case 'NIGHT_DOCTOR':
+        return renderNightDoctor();
+      case 'NIGHT_SHERIFF':
+        return renderNightSheriff();
+      case 'NIGHT_DOPPELGANGER':
+        return renderNightDoppelganger();
       case 'NIGHT_SEER':
         return renderNightSeer();
       case 'NIGHT_WITCH':
