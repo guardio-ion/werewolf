@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Award,
   Lock,
+  Unlock,
   Crosshair
 } from 'lucide-react';
 
