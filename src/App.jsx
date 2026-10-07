@@ -54,44 +54,13 @@ const ROLES = {
 const ROLE_KEYS = Object.keys(ROLES);
 
 const GAME_PRESETS = [
-  {
-    id: 'quick_8',
-    name: '⚡ Quick 8 Players',
-    desc: 'Permainan cepat & intens untuk grup kecil (8 Pemain).',
-    count: 8,
-    roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WARGA: 4 }
-  },
-  {
-    id: 'classic_10',
-    name: '📜 Classic 10 Players',
-    desc: 'Komposisi standar seimbang untuk 10 Pemain.',
-    count: 10,
-    roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WITCH: 1, WARGA: 5 }
-  },
-  {
-    id: 'balanced_12',
-    name: '🛡️ Balanced 12 Players',
-    desc: 'Pengalaman penuh dengan peran khusus untuk 12 Pemain.',
-    count: 12,
-    roles: { WEREWOLF: 3, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, WARGA: 4 }
-  },
-  {
-    id: 'chaos_15',
-    name: '🔥 Chaos 15 Players',
-    desc: 'Mode seru & menantang untuk grup besar (15 Pemain).',
-    count: 15,
-    roles: { WEREWOLF: 3, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, JESTER: 1, TRAITOR: 1, WARGA: 3 }
-  },
-  {
-    id: 'epic_18',
-    name: '🏰 Epic 18 Players',
-    desc: 'Pertempuran skala besar dengan ancaman ganda (18 Pemain).',
-    count: 18,
-    roles: { WEREWOLF: 4, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, MAYOR: 1, JESTER: 1, TRAITOR: 1, WARGA: 4 }
-  },
-  {
-    id: 'war_20',
-    name: '⚔️ Total War
+  { id: 'quick_8', name: '⚡ Quick 8 Players', desc: 'Permainan cepat & intens untuk grup kecil (8 Pemain).', count: 8, roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WARGA: 4 } },
+  { id: 'classic_10', name: '📜 Classic 10 Players', desc: 'Komposisi standar seimbang untuk 10 Pemain.', count: 10, roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WITCH: 1, WARGA: 5 } },
+  { id: 'balanced_12', name: '🛡️ Balanced 12 Players', desc: 'Pengalaman penuh dengan peran khusus untuk 12 Pemain.', count: 12, roles: { WEREWOLF: 3, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, WARGA: 4 } },
+  { id: 'chaos_15', name: '🔥 Chaos 15 Players', desc: 'Mode seru & menantang untuk grup besar (15 Pemain).', count: 15, roles: { WEREWOLF: 3, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, JESTER: 1, TRAITOR: 1, WARGA: 3 } },
+  { id: 'epic_18', name: '🏰 Epic 18 Players', desc: 'Skala besar dengan variasi role melimpah (18 Pemain).', count: 18, roles: { WEREWOLF: 4, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, MAYOR: 1, JESTER: 1, TRAITOR: 1, WARGA: 4 } },
+  { id: 'war_20', name: '⚔️ Total War 20 Players', desc: 'Pertempuran puncak seluruh role khusus (20 Pemain).', count: 20, roles: { WEREWOLF: 4, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, MAYOR: 1, LYCAN: 1, DOPPELGANGER: 1, JESTER: 1, TRAITOR: 1, WARGA: 5 } }
+];
 
 function isWolfAligned(player) {
   return player?.role === 'WEREWOLF' || player?.role === 'WOLF_CUB';
@@ -285,6 +254,10 @@ export default function App() {
   const toggleParticipant = (name) => {
     setInputPlayerNames(prev => {
       const exists = prev.includes(name);
+      if (!exists && prev.length >= 25) {
+        triggerToast('Maksimal peserta adalah 25 orang.');
+        return prev;
+      }
       const next = exists ? prev.filter(n => n !== name) : [...prev, name];
       setPlayerCount(next.length);
       return next;
@@ -292,9 +265,10 @@ export default function App() {
   };
 
   const selectAllParticipants = () => {
-    setInputPlayerNames([...PARTICIPANT_LIST]);
-    setPlayerCount(PARTICIPANT_LIST.length);
-    setRoleCountsDraft({ WARGA: Math.max(0, PARTICIPANT_LIST.length - 4), WEREWOLF: 1, GUARDIAN: 1, SEER: 1, WITCH: 1 });
+    const limitedNames = PARTICIPANT_LIST.slice(0, 25);
+    setInputPlayerNames(limitedNames);
+    setPlayerCount(limitedNames.length);
+    setRoleCountsDraft({ WARGA: Math.max(0, limitedNames.length - 4), WEREWOLF: 1, GUARDIAN: 1, SEER: 1, WITCH: 1 });
   };
 
   const clearParticipants = () => {
@@ -313,8 +287,8 @@ export default function App() {
 
   const validateAndGenerateRoles = () => {
     const trimmed = inputPlayerNames.map(n => n.trim()).filter(Boolean);
-    if (trimmed.length < 5 || trimmed.length > 20) {
-      triggerToast('Pilih 5–20 peserta untuk memulai permainan.');
+    if (trimmed.length < 5 || trimmed.length > 25) {
+      triggerToast('Pilih 5–25 peserta untuk memulai permainan.');
       return;
     }
     const totalRoles = Object.values(roleCountsDraft).reduce((sum, n) => sum + (Number(n) || 0), 0);
@@ -1499,7 +1473,7 @@ export default function App() {
             <Users className="w-6 h-6 text-amber-400" />
             <span>SETUP PEMAIN</span>
           </h2>
-          <p className="text-xs text-slate-400">Pilih preset cepat atau atur peserta manual.</p>
+          <p className="text-xs text-slate-400">Pilih preset cepat atau atur peserta manual (maks 25 orang).</p>
         </div>
 
         <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-3 shadow-xl">
@@ -1534,11 +1508,11 @@ export default function App() {
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
                 Daftar Peserta
               </label>
-              <p className="text-xs text-slate-500 mt-1">Pilih 5–20 nama peserta.</p>
+              <p className="text-xs text-slate-500 mt-1">Pilih 5–25 nama peserta.</p>
             </div>
             <div className="text-right shrink-0">
-              <div className={`text-2xl font-black ${playerCount >= 5 && playerCount <= 20 ? 'text-amber-400' : 'text-red-400'}`}>{playerCount}</div>
-              <div className="text-[10px] text-slate-500 uppercase">dipilih / 20 maks.</div>
+              <div className={`text-2xl font-black ${playerCount >= 5 && playerCount <= 25 ? 'text-amber-400' : 'text-red-400'}`}>{playerCount}</div>
+              <div className="text-[10px] text-slate-500 uppercase">dipilih / 25 maks.</div>
             </div>
           </div>
 
@@ -2468,7 +2442,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
-      {/* Background Ambient Glows */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-900/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-950/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
 
