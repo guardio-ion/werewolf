@@ -652,13 +652,24 @@ export default function App() {
   };
 
   const handleConfirmSheriff = () => {
-    if (!gameState.sheriffTargetId) { triggerToast('Pilih target Sheriff terlebih dahulu.'); return; }
+    if (!gameState.sheriffTargetId) { triggerToast('Pilih target Sheriff terlebih dahulu, atau tekan SKIP.'); return; }
     setGameState(prev => ({
       ...prev,
       sheriffUsed: true,
       gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Sheriff menggunakan kemampuan malam pada pemain terpilih.`)
     }));
     triggerToast('Aksi Sheriff dikonfirmasi. Sheriff silakan tutup mata.');
+    advanceNightPhase();
+  };
+
+  const handleSkipSheriff = () => {
+    setGameState(prev => ({
+      ...prev,
+      sheriffUsed: true,
+      sheriffTargetId: null,
+      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Sheriff memilih SKIP. Tidak ada pemeriksaan malam ini.')
+    }));
+    triggerToast('Sheriff memilih SKIP. Sheriff silakan tutup mata.');
     advanceNightPhase();
   };
 
@@ -2127,7 +2138,10 @@ export default function App() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
           {candidates.map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, sheriffTargetId: p.id }))} className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950 border-yellow-500 text-yellow-200' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
         </div>
-        <button onClick={handleConfirmSheriff} className="w-full py-4 rounded-2xl bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black flex items-center justify-center gap-2"><span>KONFIRMASI AKSI SHERIFF</span><ArrowRight className="w-5 h-5" /></button>
+        <div className="flex gap-3">
+          <button onClick={handleSkipSheriff} className="w-1/3 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700">SKIP</button>
+          <button onClick={handleConfirmSheriff} className="w-2/3 py-4 rounded-2xl bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black flex items-center justify-center gap-2"><span>KONFIRMASI AKSI SHERIFF</span><ArrowRight className="w-5 h-5" /></button>
+        </div>
       </div>
     );
   };
