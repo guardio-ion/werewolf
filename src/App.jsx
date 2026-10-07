@@ -755,6 +755,7 @@ export default function App() {
     // Previously this was declared inside the winner branch, causing a ReferenceError
     // when PROSES HASIL VOTING was pressed.
     let loverDeathNotice = [];
+    let doppelgangerRoleChangeNotice = null;
 
     if (topCandidates.length === 1 && maxVotes > 0) {
       // Single highest candidate eliminated
@@ -804,7 +805,6 @@ export default function App() {
 
       // If the Doppelganger's target was eliminated by voting (or the Lovers chain),
       // copy that role before evaluating the next win condition.
-      let doppelgangerRoleChangeNotice = null;
       ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, nightNumber, dayNumber));
 
       const eliminatedWasJester = eliminatedPlayer?.role === 'JESTER';
