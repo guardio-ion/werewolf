@@ -226,12 +226,12 @@ export default function App() {
   function triggerAutoTransitionToVoting() {
     setGameState(prev => {
       if (prev.currentPhase !== 'DISCUSSION') return prev;
-      const firstLivingIndex = prev.players.findIndex(p => p.alive);
+      // `currentVoterIndex` indexes `livingPlayers`, not the full players array.
       const newLog = addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.');
       return {
         ...prev,
         currentPhase: 'VOTING',
-        currentVoterIndex: firstLivingIndex >= 0 ? firstLivingIndex : 0,
+        currentVoterIndex: 0,
         votes: {},
         gameLog: newLog
       };
@@ -531,7 +531,7 @@ export default function App() {
     let doppelgangerRoleChangeNotice = null;
     ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, night, day, state.doppelgangerTargetId));
 
-    const tempState = {
+    let tempState = {
       ...state,
       players: updatedPlayers,
       gameLog: log,
@@ -549,6 +549,10 @@ export default function App() {
       witchKillTargetId: null,
       priestBlessedId: null
     };
+
+    if (doppelgangerRoleChangeNotice) {
+      tempState = resetDoppelgangerAbilityState(tempState, doppelgangerRoleChangeNotice.newRole);
+    }
 
     const winResult = checkWinConditions(tempState);
     if (winResult) {
@@ -719,6 +723,28 @@ export default function App() {
 
   // Doppelganger permanently replaces their role with the target's role
   // once the selected target has died, regardless of how the target died.
+  // A copied role gets a fresh ability state. Without this reset, flags from the
+  // original role owner can incorrectly make the Doppelganger's new ability unavailable.
+  const resetDoppelgangerAbilityState = (state, copiedRole) => {
+    const next = { ...state };
+    switch (copiedRole) {
+      case 'SHERIFF':
+        next.sheriffUsed = false; next.sheriffTargetId = null; break;
+      case 'PRIEST':
+        next.priestUsed = false; next.priestTargetId = null; next.priestBlessedId = null; break;
+      case 'MAYOR':
+        next.mayorRevealed = false; break;
+      case 'WITCH':
+        next.witchHealUsed = false; next.witchKillUsed = false;
+        next.witchHealUsedThisNight = false; next.witchHealTargetId = null; next.witchKillTargetId = null; break;
+      case 'CUPID':
+        next.cupidUsed = false; next.cupidLover1Id = null; next.cupidLover2Id = null; break;
+      default:
+        break;
+    }
+    return next;
+  };
+
   const applyDoppelgangerRoleIfTargetDead = (players, log, nightNumber, dayNumber, targetId = null) => {
     // Target Doppelganger disimpan di gameState.doppelgangerTargetId, bukan di objek player.
     const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
@@ -859,7 +885,8 @@ export default function App() {
             currentPhase: 'DOPPELGANGER_REVEAL',
             doppelgangerRevealNextPhase: 'GAME_OVER',
             doppelgangerRevealWinner: 'JESTER',
-            winner: 'JESTER'
+            winner: 'JESTER',
+            ...resetDoppelgangerAbilityState(gameState, doppelgangerRoleChangeNotice.newRole)
           });
           return;
         }
@@ -885,7 +912,7 @@ export default function App() {
       log = addLog(log, nightNumber, dayNumber, 'INFO', `Hasil voting seri! Tidak ada pemain yang tereliminasi.`);
     }
 
-    const tempState = {
+    let tempState = {
       ...gameState,
       players: updatedPlayers,
       gameLog: log,
@@ -893,6 +920,10 @@ export default function App() {
       loverDeathNotice,
       doppelgangerRoleChangeNotice
     };
+
+    if (doppelgangerRoleChangeNotice) {
+      tempState = resetDoppelgangerAbilityState(tempState, doppelgangerRoleChangeNotice.newRole);
+    }
 
     const winResult = checkWinConditions(tempState);
     if (winResult) {
