@@ -8,6 +8,7 @@ import {
   Moon,
   Sun,
   Eye,
+  EyeOff,
   FlaskConical,
   Heart,
   Skull,
@@ -109,6 +110,7 @@ function createInitialGameState() {
     witchHealUsed: false,
     witchKillUsed: false,
     cupidUsed: false,
+    nightSkips: {},
     currentVoterIndex: 0,
     votes: {},
     revealPlayerIndex: 0,
@@ -173,6 +175,7 @@ export default function App() {
   const [participantSearch, setParticipantSearch] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
   const [roleCountsDraft, setRoleCountsDraft] = useState({});
+  const [privacyMode, setPrivacyMode] = useState(false);
 
   useEffect(() => {
     if (Object.keys(roleCountsDraft).length === 0 && playerCount > 0) {
@@ -250,6 +253,109 @@ export default function App() {
   function triggerToast(msg) {
     setToastMessage(msg);
   }
+
+  const getLivingTargets = (state, kind) => {
+    const players = state.players || [];
+    switch (kind) {
+      case 'WEREWOLF':
+        return players.filter(p => p.alive && !isWolfAligned(p));
+      case 'GUARDIAN':
+        return players.filter(p => p.alive && !p.protectedLastNight);
+      case 'SHERIFF': {
+        const sheriff = players.find(p => p.role === 'SHERIFF' && p.alive);
+        return players.filter(p => p.alive && p.id !== sheriff?.id);
+      }
+      case 'DOPPELGANGER':
+        return players.filter(p => p.alive && p.role !== 'DOPPELGANGER');
+      case 'SEER': {
+        const seer = players.find(p => p.role === 'SEER' && p.alive);
+        return players.filter(p => p.alive && p.id !== seer?.id);
+      }
+      case 'HUNTER':
+        return players.filter(p => p.alive);
+      case 'WITCH':
+      default:
+        return players.filter(p => p.alive);
+    }
+  };
+
+  const validateTarget = (state, kind, targetId) => {
+    if (!targetId) return { valid: false, reason: 'Pilih target terlebih dahulu.' };
+    const target = state.players.find(p => p.id === targetId);
+    if (!target || !target.alive) return { valid: false, reason: 'Target tidak valid: pemain sudah tereliminasi atau tidak ditemukan.' };
+    if (!getLivingTargets(state, kind).some(p => p.id === targetId)) {
+      const reasons = {
+        WEREWOLF: 'Werewolf hanya dapat memilih pemain non-Evil yang masih hidup.',
+        GUARDIAN: 'Guardian tidak boleh melindungi pemain yang sama dua malam berturut-turut.',
+        SHERIFF: 'Sheriff harus memilih pemain hidup selain dirinya sendiri.',
+        DOPPELGANGER: 'Doppelganger harus memilih target hidup selain dirinya sendiri.',
+        SEER: 'Seer harus memilih pemain hidup selain dirinya sendiri.'
+      };
+      return { valid: false, reason: reasons[kind] || 'Target tidak tersedia untuk aksi ini.' };
+    }
+    return { valid: true };
+  };
+
+  const getPhaseAssistant = () => {
+    const state = gameState;
+    if (privacyMode) {
+      return {
+        eyebrow: '🔒 PRIVACY MODE',
+        title: 'Informasi moderator disembunyikan',
+        detail: 'Layar aman untuk diperlihatkan kepada pemain. State permainan tidak berubah.',
+        next: 'Lanjutkan hanya dengan kontrol fase yang terlihat.',
+        tone: 'border-slate-700 bg-slate-900/95'
+      };
+    }
+
+    const living = state.players.filter(p => p.alive);
+    const configs = {
+      ROLE_SUMMARY: ['🎭 ROLE SETUP', 'Komposisi role siap dibagikan.', 'NEXT: Bagikan role secara berurutan.'],
+      ROLE_REVEAL: ['🔐 ROLE REVEAL', `Sedang membuka role pemain ${Math.min(state.revealPlayerIndex + 1, state.players.length)} dari ${state.players.length}.`, 'NEXT: Sembunyikan kembali kartu lalu lanjut ke pemain berikutnya.'],
+      DOPPELGANGER_REVEAL: ['🎭 DOPPELGANGER', 'Ada perubahan role yang perlu dibaca moderator.', 'NEXT: Konfirmasi reveal untuk melanjutkan flow.'],
+      NIGHT_INTRO: [`🌙 MALAM ${state.nightNumber}`, 'Semua pemain menutup mata.', 'NEXT: Mulai urutan aksi malam.'],
+      MORNING: [`☀️ PAGI ${state.dayNumber}`, `${state.lastNightDeaths.length} pemain tereliminasi pada malam terakhir.`, 'NEXT: Tampilkan hasil malam lalu masuk diskusi.'],
+      DISCUSSION: ['💬 DISKUSI', state.discussionEndTimestamp ? `Timer ${formatTime(remainingSeconds)} tersisa.` : 'Timer belum dimulai.', 'NEXT: Selesaikan diskusi untuk masuk voting.'],
+      VOTING: ['🗳️ VOTING', `${Object.keys(state.votes || {}).length}/${living.length} suara tercatat.`, 'NEXT: Selesaikan seluruh voting lalu proses hasil.'],
+      HUNTER_REVENGE: ['🏹 HUNTER REVENGE', 'Hunter yang tereliminasi memiliki kesempatan balas dendam.', 'NEXT: Pilih target hidup atau lanjut sesuai aturan meja.'],
+      GAME_OVER: ['🏆 GAME OVER', 'Kondisi kemenangan sudah tercapai.', 'NEXT: Tidak ada aksi permainan yang boleh dijalankan.']
+    };
+
+    const cfg = configs[state.currentPhase];
+    if (cfg) return { eyebrow: cfg[0], title: cfg[1], detail: cfg[2], next: cfg[2], tone: 'border-amber-700/50 bg-slate-900/95' };
+
+    const phaseConfig = {
+      NIGHT_CUPID: ['💘 CUPID', 'Pilih dua pemain hidup untuk Lovers.', 'NEXT: Konfirmasi pasangan.'],
+      NIGHT_WEREWOLF: ['🐺 WEREWOLF', `${getLivingTargets(state, 'WEREWOLF').length} target valid tersedia.`, state.werewolfTargetIds?.length ? 'NEXT: Konfirmasi target Werewolf.' : 'NEXT: Pilih target yang valid.'],
+      NIGHT_GUARDIAN: ['🛡️ GUARDIAN', `${getLivingTargets(state, 'GUARDIAN').length} target valid tersedia.`, state.guardianTargetId ? 'NEXT: Konfirmasi perlindungan.' : 'NEXT: Pilih target perlindungan.'],
+      NIGHT_SHERIFF: ['⭐ SHERIFF', state.sheriffUsed ? 'Ability sudah digunakan.' : 'Investigation masih tersedia 1x.', state.sheriffTargetId ? 'NEXT: Konfirmasi atau gunakan SKIP.' : 'NEXT: Pilih target atau SKIP.'],
+      NIGHT_DOPPELGANGER: ['🎭 DOPPELGANGER', `${getLivingTargets(state, 'DOPPELGANGER').length} target valid tersedia.`, state.doppelgangerTargetId ? 'NEXT: Konfirmasi target.' : 'NEXT: Pilih target.'],
+      NIGHT_SEER: ['🔮 SEER', state.seerResult ? `Hasil untuk ${state.seerResult.targetName} sudah tersedia.` : `${getLivingTargets(state, 'SEER').length} target valid tersedia.`, state.seerResult ? 'NEXT: Tutup hasil Seer.' : 'NEXT: Pilih target untuk diperiksa.'],
+      NIGHT_WITCH: ['🧪 WITCH', `Heal ${state.witchHealUsed ? 'TERPAKAI' : 'TERSEDIA'} · Kill ${state.witchKillUsed ? 'TERPAKAI' : 'TERSEDIA'}.`, 'NEXT: Gunakan potion yang diperlukan atau selesaikan fase Witch.']
+    };
+    const pc = phaseConfig[state.currentPhase];
+    if (pc) return { eyebrow: pc[0], title: pc[1], detail: pc[2], next: pc[2], tone: 'border-indigo-700/50 bg-slate-900/95' };
+    return { eyebrow: '🎮 GAME MASTER', title: 'State permainan siap.', detail: 'Gunakan kontrol fase yang tersedia.', next: 'NEXT: Ikuti instruksi layar.', tone: 'border-slate-700 bg-slate-900/95' };
+  };
+
+  const renderSmartAssistant = () => {
+    if (gameState.currentPhase === 'HOME' || gameState.currentPhase === 'SETUP') return null;
+    const assistant = getPhaseAssistant();
+    return (
+      <section className={`w-full border-b ${assistant.tone} px-4 py-3 shadow-inner animate-fadeIn`}>
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          <div className="min-w-0">
+            <div className="text-[10px] font-black tracking-widest text-amber-400 uppercase">{assistant.eyebrow}</div>
+            <div className="text-sm font-black text-white truncate">{assistant.title}</div>
+            <div className="text-[11px] text-slate-400 truncate">{assistant.detail}</div>
+          </div>
+          <div className="shrink-0 text-[10px] sm:text-xs font-black text-slate-200 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-2">
+            {assistant.next}
+          </div>
+        </div>
+      </section>
+    );
+  };
 
   const toggleParticipant = (name) => {
     setInputPlayerNames(prev => {
@@ -336,40 +442,55 @@ export default function App() {
     });
   };
 
-  const advanceNightPhase = () => {
+  const advanceNightPhase = (overrides = {}, options = {}) => {
     setGameState(prev => {
-      const { nightNumber, players, cupidUsed } = prev;
-      const canContinueFrom = (...phases) => phases.includes(prev.currentPhase);
+      if (prev.currentPhase === 'GAME_OVER') return prev;
 
-      if (nightNumber === 1 && players.some(p => p.role === 'CUPID' && p.alive) && !cupidUsed && prev.currentPhase === 'NIGHT_INTRO') {
-        return { ...prev, currentPhase: 'NIGHT_CUPID' };
-      }
-      const livingWerewolves = players.filter(p => isWolfAligned(p) && p.alive);
-      if (livingWerewolves.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID')) {
-        return { ...prev, currentPhase: 'NIGHT_WEREWOLF' };
-      }
-      const guardian = players.find(p => p.role === 'GUARDIAN' && p.alive);
-      if (guardian && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
-        return { ...prev, currentPhase: 'NIGHT_GUARDIAN' };
-      }
-      const sheriff = players.find(p => p.role === 'SHERIFF' && p.alive);
-      if (sheriff && !prev.sheriffUsed && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
-        return { ...prev, currentPhase: 'NIGHT_SHERIFF' };
-      }
-      const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
-      if (doppel && nightNumber === 1 && !prev.doppelgangerTargetId && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
-        return { ...prev, currentPhase: 'NIGHT_DOPPELGANGER' };
-      }
-      const seer = players.find(p => p.role === 'SEER' && p.alive);
-      if (seer && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER')) {
-        return { ...prev, currentPhase: 'NIGHT_SEER' };
-      }
-      const witch = players.find(p => p.role === 'WITCH' && p.alive);
-      if (witch && (!prev.witchHealUsed || !prev.witchKillUsed) && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
-        return { ...prev, currentPhase: 'NIGHT_WITCH' };
+      const state = { ...prev, ...overrides };
+      const canContinueFrom = (...phases) => phases.includes(state.currentPhase);
+      const commit = options.recordUndo ? { ...state, undoStack: pushUndoState(prev) } : state;
+
+      if (state.nightNumber === 1 && state.players.some(p => p.role === 'CUPID' && p.alive) && !state.cupidUsed && !state.nightSkips?.CUPID && state.currentPhase === 'NIGHT_INTRO') {
+        return { ...commit, currentPhase: 'NIGHT_CUPID' };
       }
 
-      return resolveNightActions(prev);
+      const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
+      const wolfTargets = getLivingTargets(state, 'WEREWOLF');
+      if (livingWerewolves.length > 0 && wolfTargets.length > 0 && !state.werewolfTargetIds?.length && !state.nightSkips?.WEREWOLF && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
+        return { ...commit, currentPhase: 'NIGHT_WEREWOLF' };
+      }
+
+      const guardian = state.players.find(p => p.role === 'GUARDIAN' && p.alive);
+      const guardianTargets = getLivingTargets(state, 'GUARDIAN');
+      if (guardian && guardianTargets.length > 0 && !state.guardianTargetId && !state.nightSkips?.GUARDIAN && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
+        return { ...commit, currentPhase: 'NIGHT_GUARDIAN' };
+      }
+
+      const sheriff = state.players.find(p => p.role === 'SHERIFF' && p.alive);
+      const sheriffTargets = getLivingTargets(state, 'SHERIFF');
+      if (sheriff && !state.sheriffUsed && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
+        return { ...commit, currentPhase: 'NIGHT_SHERIFF' };
+      }
+
+      const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
+      const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
+      if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
+        return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
+      }
+
+      const seer = state.players.find(p => p.role === 'SEER' && p.alive);
+      const seerTargets = getLivingTargets(state, 'SEER');
+      if (seer && seerTargets.length > 0 && !state.seerTargetId && !state.nightSkips?.SEER && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
+        return { ...commit, currentPhase: 'NIGHT_SEER' };
+      }
+
+      const witch = state.players.find(p => p.role === 'WITCH' && p.alive);
+      const witchTargets = getLivingTargets(state, 'WITCH');
+      if (witch && witchTargets.length > 0 && !state.nightSkips?.WITCH && (!state.witchHealUsed || !state.witchKillUsed) && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
+        return { ...commit, currentPhase: 'NIGHT_WITCH' };
+      }
+
+      return resolveNightActions(commit);
     });
   };
 
@@ -487,6 +608,7 @@ export default function App() {
       witchHealTargetId: null,
       witchKillTargetId: null,
       hunterTargetId: null,
+      nightSkips: {},
     };
 
     if (doppelgangerRoleChangeNotice) {
@@ -543,6 +665,11 @@ export default function App() {
   }
 
   const handleSeerInspect = (targetId) => {
+    const validation = validateTarget(gameState, 'SEER', targetId);
+    if (!validation.valid) {
+      triggerToast(validation.reason);
+      return;
+    }
     const target = gameState.players.find(p => p.id === targetId);
     if (!target) return;
 
@@ -568,8 +695,13 @@ export default function App() {
       triggerToast('Pilih dua pemain berbeda untuk menjadi pasangan.');
       return;
     }
+
     const p1 = players.find(p => p.id === cupidLover1Id);
     const p2 = players.find(p => p.id === cupidLover2Id);
+    if (!p1?.alive || !p2?.alive) {
+      triggerToast('Kedua pemain harus masih hidup.');
+      return;
+    }
 
     const updatedPlayers = players.map(p => {
       if (p.id === cupidLover1Id) return { ...p, loverId: cupidLover2Id };
@@ -578,38 +710,166 @@ export default function App() {
     });
 
     const newLog = addLog(gameState.gameLog, nightNumber, dayNumber, 'ACTION', `Cupid memilih ${p1.name} & ${p2.name} sebagai Pasangan Lovers.`);
-
-    setGameState(prev => ({
-      ...prev,
-      undoStack: pushUndoState(prev),
-      players: updatedPlayers,
-      cupidUsed: true,
-      gameLog: newLog
-    }));
-
     triggerToast(`Pasangan ${p1.name} ❤️ ${p2.name} berhasil dibuat.`);
-    advanceNightPhase();
+    advanceNightPhase(
+      { players: updatedPlayers, cupidUsed: true, gameLog: newLog },
+      { recordUndo: true }
+    );
   };
 
   const handleConfirmDoppelganger = () => {
     const targetId = gameState.doppelgangerTargetId;
-    const target = gameState.players.find(p => p.id === targetId && p.alive && p.role !== 'DOPPELGANGER');
-    if (!target) { triggerToast('Pilih satu target hidup untuk Doppelganger.'); return; }
-    setGameState(prev => ({ ...prev, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Doppelganger memilih ${target.name} sebagai target.`) }));
-    advanceNightPhase();
+    const validation = validateTarget(gameState, 'DOPPELGANGER', targetId);
+    if (!validation.valid) {
+      triggerToast(validation.reason);
+      return;
+    }
+
+    const target = gameState.players.find(p => p.id === targetId);
+    const newLog = addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Doppelganger memilih ${target.name} sebagai target.`);
+    advanceNightPhase(
+      { doppelgangerTargetId: targetId, gameLog: newLog },
+      { recordUndo: true }
+    );
   };
 
   const handleConfirmSheriff = () => {
-    if (!gameState.sheriffTargetId) { triggerToast('Pilih target Sheriff terlebih dahulu, atau tekan SKIP.'); return; }
-    setGameState(prev => ({ ...prev, sheriffUsed: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Sheriff menggunakan kemampuan malam pada pemain terpilih.`) }));
+    const validation = validateTarget(gameState, 'SHERIFF', gameState.sheriffTargetId);
+    if (!validation.valid) {
+      triggerToast('Pilih target Sheriff terlebih dahulu, atau tekan SKIP.');
+      return;
+    }
+
+    const newLog = addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', 'Sheriff menggunakan kemampuan malam pada pemain terpilih.');
     triggerToast('Aksi Sheriff dikonfirmasi.');
-    advanceNightPhase();
+    advanceNightPhase(
+      { sheriffUsed: true, gameLog: newLog },
+      { recordUndo: true }
+    );
   };
 
   const handleSkipSheriff = () => {
-    setGameState(prev => ({ ...prev, sheriffUsed: true, sheriffTargetId: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Sheriff memilih SKIP.') }));
+    const newLog = addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'INFO', 'Sheriff memilih SKIP.');
     triggerToast('Sheriff memilih SKIP.');
-    advanceNightPhase();
+    advanceNightPhase(
+      { sheriffUsed: true, sheriffTargetId: null, gameLog: newLog },
+      { recordUndo: true }
+    );
+  };
+
+  const handleConfirmWerewolf = (selectedIds) => {
+    const required = gameState.wolfCubRagePending ? 2 : 1;
+    if (!selectedIds || selectedIds.length !== required) {
+      triggerToast(`Pilih ${required} target${required > 1 ? 's' : ''}.`);
+      return;
+    }
+    for (const targetId of selectedIds) {
+      const validation = validateTarget(gameState, 'WEREWOLF', targetId);
+      if (!validation.valid) {
+        triggerToast(validation.reason);
+        return;
+      }
+    }
+    const log = addLog(
+      gameState.gameLog,
+      gameState.nightNumber,
+      gameState.dayNumber,
+      'ACTION',
+      `Werewolf mengunci ${selectedIds.length} target untuk malam ini.`
+    );
+    advanceNightPhase(
+      { werewolfTargetIds: [...selectedIds], werewolfTargetId: selectedIds[0] || null, gameLog: log },
+      { recordUndo: true }
+    );
+  };
+
+  const handleConfirmGuardian = () => {
+    const validation = validateTarget(gameState, 'GUARDIAN', gameState.guardianTargetId);
+    if (!validation.valid) {
+      triggerToast(validation.reason);
+      return;
+    }
+    const log = addLog(
+      gameState.gameLog,
+      gameState.nightNumber,
+      gameState.dayNumber,
+      'ACTION',
+      'Guardian mengunci target perlindungan.'
+    );
+    advanceNightPhase(
+      { guardianTargetId: gameState.guardianTargetId, gameLog: log },
+      { recordUndo: true }
+    );
+  };
+
+  const handleFinishWitch = () => {
+    const nextState = {
+      witchHealUsed: gameState.witchHealUsed || !!gameState.witchHealTargetId,
+      witchKillUsed: gameState.witchKillUsed || !!gameState.witchKillTargetId
+    };
+
+    if (gameState.witchHealTargetId) {
+      const validation = validateTarget(gameState, 'WITCH', gameState.witchHealTargetId);
+      if (!validation.valid) {
+        triggerToast(validation.reason);
+        return;
+      }
+    }
+    if (gameState.witchKillTargetId) {
+      const validation = validateTarget(gameState, 'WITCH', gameState.witchKillTargetId);
+      if (!validation.valid) {
+        triggerToast(validation.reason);
+        return;
+      }
+    }
+
+    advanceNightPhase(
+      { ...nextState, nightSkips: { ...(gameState.nightSkips || {}), WITCH: true } },
+      { recordUndo: true }
+    );
+  };
+
+  const handleSkipNightAction = (roleKey, message) => {
+    const cleared = {
+      nightSkips: { ...(gameState.nightSkips || {}), [roleKey]: true },
+      gameLog: addLog(
+        gameState.gameLog,
+        gameState.nightNumber,
+        gameState.dayNumber,
+        'INFO',
+        `⏭️ ${message}`
+      )
+    };
+
+    switch (roleKey) {
+      case 'CUPID':
+        cleared.cupidLover1Id = null;
+        cleared.cupidLover2Id = null;
+        break;
+      case 'WEREWOLF':
+        cleared.werewolfTargetId = null;
+        cleared.werewolfTargetIds = [];
+        break;
+      case 'GUARDIAN':
+        cleared.guardianTargetId = null;
+        break;
+      case 'DOPPELGANGER':
+        cleared.doppelgangerTargetId = null;
+        break;
+      case 'SEER':
+        cleared.seerTargetId = null;
+        cleared.seerResult = null;
+        break;
+      case 'WITCH':
+        cleared.witchHealTargetId = null;
+        cleared.witchKillTargetId = null;
+        cleared.witchHealUsedThisNight = false;
+        break;
+      default:
+        break;
+    }
+
+    advanceNightPhase(cleared, { recordUndo: true });
   };
 
   const handleHunterRevenge = (targetId) => {
@@ -651,11 +911,36 @@ export default function App() {
   };
 
   const handleVoteSubmit = (voterId, targetId = null) => {
+    if (gameState.currentPhase !== 'VOTING') {
+      triggerToast('Voting sudah tidak aktif.');
+      return;
+    }
+
+    const voter = gameState.players.find(p => p.id === voterId);
+    if (!voter?.alive) {
+      triggerToast('Pemain mati tidak dapat memberikan suara.');
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(gameState.votes, voterId)) {
+      triggerToast('Pemain ini sudah memberikan suara.');
+      return;
+    }
+    if (targetId) {
+      const target = gameState.players.find(p => p.id === targetId);
+      if (!target?.alive || target.id === voterId) {
+        triggerToast('Target voting tidak valid.');
+        return;
+      }
+    }
+
     setGameState(prev => {
+      if (prev.currentPhase !== 'VOTING') return prev;
+      if (Object.prototype.hasOwnProperty.call(prev.votes, voterId)) return prev;
       const newVotes = { ...prev.votes, [voterId]: targetId };
       const nextVoterIndex = prev.currentVoterIndex + 1;
-      const voter = prev.players.find(p => p.id === voterId);
-      const voteLog = targetId ? `🗳️ ${voter?.name || 'Pemain'} memberikan suara.` : `⏭️ ${voter?.name || 'Pemain'} memilih SKIP VOTE.`;
+      const voteLog = targetId
+        ? `🗳️ ${voter.name} memberikan suara.`
+        : `⏭️ ${voter.name} memilih SKIP VOTE.`;
 
       return {
         ...prev,
@@ -703,9 +988,12 @@ export default function App() {
     const { votes, players, nightNumber, dayNumber } = gameState;
 
     const voteCounts = {};
+    let validVoteCount = 0;
     Object.entries(votes).forEach(([voterId, targetId]) => {
       const voter = players.find(p => p.id === voterId && p.alive);
-      if (!voter || !targetId) return;
+      const target = targetId ? players.find(p => p.id === targetId && p.alive) : null;
+      if (!voter || !target || target.id === voter.id) return;
+      validVoteCount += 1;
       const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1;
       voteCounts[targetId] = (voteCounts[targetId] || 0) + weight;
     });
@@ -714,7 +1002,6 @@ export default function App() {
     Object.values(voteCounts).forEach(cnt => { if (cnt > maxVotes) maxVotes = cnt; });
 
     const topCandidates = maxVotes > 0 ? Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes) : [];
-    const validVoteCount = Object.values(votes).filter(Boolean).length;
     const allVotesSkipped = validVoteCount === 0;
 
     let updatedPlayers = players.map(p => ({ ...p }));
@@ -1013,6 +1300,32 @@ export default function App() {
               <span className="font-black text-white">{livingPlayers.length} Hidup · {deadPlayers.length} Mati</span>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPrivacyOverlay = () => {
+    if (!privacyMode) return null;
+    return (
+      <div className="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-6">
+        <div className="w-full max-w-md text-center space-y-5">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-900 border border-slate-700 text-amber-400 shadow-2xl">
+            <EyeOff className="w-10 h-10" />
+          </div>
+          <div>
+            <div className="text-[10px] font-black tracking-[0.25em] text-amber-400 uppercase">PRIVACY MODE</div>
+            <h2 className="text-2xl font-black text-white mt-2">INFORMASI RAHASIA TERSEMBUNYI</h2>
+            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+              Layar aman untuk diperlihatkan kepada pemain. Role, target, hasil investigasi, log rahasia, dan informasi moderator tidak ditampilkan.
+            </p>
+          </div>
+          <button
+            onClick={() => setPrivacyMode(false)}
+            className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-xl shadow-amber-950/40"
+          >
+            KELUAR PRIVACY MODE
+          </button>
         </div>
       </div>
     );
@@ -1365,6 +1678,15 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setPrivacyMode(prev => !prev)}
+              className={`p-2 rounded-xl border transition ${privacyMode ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800/90 hover:bg-slate-700 border-slate-700/80 text-amber-300'}`}
+              title={privacyMode ? 'Keluar Privacy Mode' : 'Aktifkan Privacy Mode'}
+              aria-label={privacyMode ? 'Keluar Privacy Mode' : 'Aktifkan Privacy Mode'}
+            >
+              {privacyMode ? <Unlock className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </button>
+
+            <button
               onClick={handleBackToHome}
               className="p-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 transition"
               title="Kembali ke Halaman Awal"
@@ -1653,7 +1975,24 @@ export default function App() {
   const renderRoleReveal = () => {
     const { revealPlayerIndex, isRoleCardOpen, players } = gameState;
     const currentPlayer = players[revealPlayerIndex];
-    const roleMeta = ROLES[currentPlayer.role];
+    if (!currentPlayer) {
+      return (
+        <div className="max-w-md mx-auto p-6 text-center space-y-4 animate-fadeIn">
+          <div className="bg-red-950/70 border border-red-700/60 rounded-3xl p-6 space-y-3">
+            <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
+            <h2 className="text-xl font-black text-white">ROLE REVEAL TIDAK VALID</h2>
+            <p className="text-xs text-slate-400">Index pemain pada state tersimpan tidak valid. Flow dikembalikan ke ringkasan role.</p>
+            <button
+              onClick={() => setGameState(prev => ({ ...prev, currentPhase: 'ROLE_SUMMARY', revealPlayerIndex: 0, isRoleCardOpen: false }))}
+              className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm"
+            >
+              KEMBALI KE RINGKASAN ROLE
+            </button>
+          </div>
+        </div>
+      );
+    }
+    const roleMeta = ROLES[currentPlayer.role] || ROLES.WARGA;
 
     return (
       <div className="max-w-md mx-auto p-4 sm:p-6 min-h-[80vh] flex flex-col justify-between space-y-6 animate-fadeIn">
@@ -1806,6 +2145,13 @@ export default function App() {
           })}
         </div>
 
+        <button
+          onClick={() => handleSkipNightAction('CUPID', 'Cupid memilih SKIP; Lovers tidak dibentuk malam ini.')}
+          className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition"
+        >
+          ⏭️ SKIP CUPID
+        </button>
+
         <div className="flex gap-3 pt-2">
           <button
             onClick={() => setGameState(prev => ({ ...prev, cupidLover1Id: null, cupidLover2Id: null }))}
@@ -1860,10 +2206,18 @@ export default function App() {
           })}
         </div>
 
-        <button onClick={() => { if (selectedIds.length !== (rage ? 2 : 1)) { triggerToast(rage ? 'Pilih 2 target.' : 'Pilih 1 target.'); return; } advanceNightPhase(); }} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition">
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleSkipNightAction('WEREWOLF', 'Werewolf memilih SKIP; tidak ada serangan Werewolf malam ini.')}
+            className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition"
+          >
+            ⏭️ SKIP
+          </button>
+          <button onClick={() => handleConfirmWerewolf(selectedIds)} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition">
           <span>KONFIRMASI TARGET WEREWOLF</span>
           <ArrowRight className="w-5 h-5" />
         </button>
+        </div>
       </div>
     );
   };
@@ -1902,16 +2256,21 @@ export default function App() {
           })}
         </div>
 
-        <button
-          onClick={() => {
-            if (!gameState.guardianTargetId) { triggerToast('Pilih pemain untuk dilindungi.'); return; }
-            advanceNightPhase();
-          }}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-950/50 flex items-center justify-center gap-2 transition"
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleSkipNightAction('GUARDIAN', 'Guardian memilih SKIP; tidak ada perlindungan malam ini.')}
+            className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition"
+          >
+            ⏭️ SKIP
+          </button>
+          <button
+          onClick={handleConfirmGuardian}
+          className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-950/50 flex items-center justify-center gap-2 transition"
         >
           <span>KONFIRMASI GUARDIAN</span>
           <ArrowRight className="w-5 h-5" />
         </button>
+        </div>
       </div>
     );
   };
@@ -1979,10 +2338,18 @@ export default function App() {
           ))}
         </div>
 
-        <button onClick={handleConfirmDoppelganger} className="w-full py-4 rounded-2xl bg-indigo-700 hover:bg-indigo-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-indigo-950/50 transition">
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleSkipNightAction('DOPPELGANGER', 'Doppelganger memilih SKIP; target tidak dipilih malam ini.')}
+            className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition"
+          >
+            ⏭️ SKIP
+          </button>
+          <button onClick={handleConfirmDoppelganger} className="w-2/3 py-4 rounded-2xl bg-indigo-700 hover:bg-indigo-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-indigo-950/50 transition">
           <span>KONFIRMASI DOPPELGANGER</span>
           <ArrowRight className="w-5 h-5" />
         </button>
+        </div>
       </div>
     );
   };
@@ -2000,6 +2367,15 @@ export default function App() {
           <h2 className="text-2xl font-black text-cyan-400">🔮 SEER PHASE</h2>
           <p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diramal perannya.</p>
         </div>
+
+        {!result && (
+          <button
+            onClick={() => handleSkipNightAction('SEER', 'Seer memilih SKIP; tidak melakukan pemeriksaan malam ini.')}
+            className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition mb-3"
+          >
+            ⏭️ SKIP SEER
+          </button>
+        )}
 
         {result ? (
           <div className="bg-gradient-to-br from-cyan-950 via-slate-900 to-cyan-950 border-2 border-cyan-500/80 rounded-3xl p-6 text-center space-y-4 shadow-2xl animate-fadeIn">
@@ -2083,14 +2459,14 @@ export default function App() {
         </div>
 
         <button
-          onClick={() => {
-            setGameState(prev => ({
-              ...prev,
-              witchHealUsed: prev.witchHealUsed || !!prev.witchHealTargetId,
-              witchKillUsed: prev.witchKillUsed || !!prev.witchKillTargetId
-            }));
-            advanceNightPhase();
-          }}
+          onClick={() => handleSkipNightAction('WITCH', 'Witch memilih SKIP; potion tetap tersimpan untuk malam berikutnya.')}
+          className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition mb-3"
+        >
+          ⏭️ SKIP WITCH
+        </button>
+
+        <button
+          onClick={handleFinishWitch}
           className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-purple-950/50 flex items-center justify-center gap-2 transition"
         >
           <span>SELESAIKAN WITCH & PROSES MALAM</span>
@@ -2453,8 +2829,15 @@ export default function App() {
       {renderGameLogDrawer()}
       {renderModeratorDashboard()}
       {renderHeader()}
+      {renderSmartAssistant()}
       {renderNightTimeline()}
-      <main className="flex-1 pb-8">{renderCurrentPhase()}</main>
+      <main
+        key={`${gameState.currentPhase}-${gameState.nightNumber}-${gameState.dayNumber}-${gameState.revealPlayerIndex}`}
+        className="flex-1 pb-8"
+      >
+        {renderCurrentPhase()}
+      </main>
+      {renderPrivacyOverlay()}
     </div>
   );
 }
