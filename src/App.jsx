@@ -53,6 +53,37 @@ const ROLES = {
 
 const ROLE_KEYS = Object.keys(ROLES);
 
+const GAME_PRESETS = [
+  {
+    id: 'quick_8',
+    name: '⚡ Quick 8 Players',
+    desc: 'Permainan cepat & intens untuk grup kecil (8 Pemain).',
+    count: 8,
+    roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WARGA: 4 }
+  },
+  {
+    id: 'classic_10',
+    name: '📜 Classic 10 Players',
+    desc: 'Komposisi standar seimbang untuk 10 Pemain.',
+    count: 10,
+    roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WITCH: 1, WARGA: 5 }
+  },
+  {
+    id: 'balanced_12',
+    name: '🛡️ Balanced 12 Players',
+    desc: 'Pengalaman penuh dengan peran khusus untuk 12 Pemain.',
+    count: 12,
+    roles: { WEREWOLF: 3, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, WARGA: 4 }
+  },
+  {
+    id: 'chaos_15',
+    name: '🔥 Chaos 15 Players',
+    desc: 'Mode seru & menantang untuk grup besar (15 Pemain).',
+    count: 15,
+    roles: { WEREWOLF: 3, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, JESTER: 1, TRAITOR: 1, WARGA: 3 }
+  }
+];
+
 function isWolfAligned(player) {
   return player?.role === 'WEREWOLF' || player?.role === 'WOLF_CUB';
 }
@@ -156,6 +187,7 @@ export default function App() {
 
   const [showRoleListDrawer, setShowRoleListDrawer] = useState(false);
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
+  const [showDashboardDrawer, setShowDashboardDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [confirmModalData, setConfirmModalData] = useState(null);
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
@@ -276,6 +308,14 @@ export default function App() {
     setInputPlayerNames([]);
     setPlayerCount(0);
     setRoleCountsDraft({});
+  };
+
+  const applyGamePreset = (preset) => {
+    const selectedNames = PARTICIPANT_LIST.slice(0, preset.count);
+    setInputPlayerNames(selectedNames);
+    setPlayerCount(preset.count);
+    setRoleCountsDraft(preset.roles);
+    triggerToast(`Preset "${preset.name}" diterapkan.`);
   };
 
   const validateAndGenerateRoles = () => {
@@ -1057,6 +1097,7 @@ export default function App() {
         setConfirmModalData(null);
         setShowRoleListDrawer(false);
         setShowGameLogDrawer(false);
+        setShowDashboardDrawer(false);
         setShowRulesModal(false);
         setToastMessage(null);
         setInputPlayerNames([]);
@@ -1082,6 +1123,135 @@ export default function App() {
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const renderNightTimeline = () => {
+    if (!gameState.currentPhase.startsWith('NIGHT_') || gameState.currentPhase === 'NIGHT_INTRO') return null;
+
+    const nightSteps = [
+      { key: 'NIGHT_CUPID', label: 'Cupid', active: gameState.nightNumber === 1 && gameState.players.some(p => p.role === 'CUPID' && p.alive) },
+      { key: 'NIGHT_WEREWOLF', label: 'Werewolf', active: gameState.players.some(p => isWolfAligned(p) && p.alive) },
+      { key: 'NIGHT_GUARDIAN', label: 'Guardian', active: gameState.players.some(p => p.role === 'GUARDIAN' && p.alive) },
+      { key: 'NIGHT_SHERIFF', label: 'Sheriff', active: gameState.players.some(p => p.role === 'SHERIFF' && p.alive) && !gameState.sheriffUsed },
+      { key: 'NIGHT_DOPPELGANGER', label: 'Doppelganger', active: gameState.nightNumber === 1 && gameState.players.some(p => p.role === 'DOPPELGANGER' && p.alive && !gameState.doppelgangerTargetId) },
+      { key: 'NIGHT_SEER', label: 'Seer', active: gameState.players.some(p => p.role === 'SEER' && p.alive) },
+      { key: 'NIGHT_WITCH', label: 'Witch', active: gameState.players.some(p => p.role === 'WITCH' && p.alive) && (!gameState.witchHealUsed || !gameState.witchKillUsed) }
+    ].filter(s => s.active);
+
+    const activeIndex = nightSteps.findIndex(s => s.key === gameState.currentPhase);
+
+    return (
+      <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 overflow-x-auto">
+        <div className="max-w-xl mx-auto flex items-center justify-center gap-2 text-xs">
+          {nightSteps.map((step, idx) => {
+            const isDone = idx < activeIndex;
+            const isCurrent = idx === activeIndex;
+
+            return (
+              <React.Fragment key={step.key}>
+                {idx > 0 && <span className="text-slate-600">→</span>}
+                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full border transition font-bold whitespace-nowrap ${
+                  isCurrent 
+                    ? 'bg-indigo-950 border-indigo-500 text-indigo-300 shadow-md shadow-indigo-950/50' 
+                    : isDone 
+                    ? 'bg-slate-950 border-slate-800 text-emerald-400' 
+                    : 'bg-slate-950/40 border-slate-900 text-slate-600'
+                }`}>
+                  <span>{isDone ? '✓' : isCurrent ? '●' : '○'}</span>
+                  <span>{step.label}</span>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderModeratorDashboard = () => {
+    if (!showDashboardDrawer) return null;
+
+    const livingPlayers = gameState.players.filter(p => p.alive);
+    const deadPlayers = gameState.players.filter(p => !p.alive);
+
+    const livingGood = livingPlayers.filter(p => !isWolfAligned(p) && p.role !== 'JESTER').length;
+    const livingEvil = livingPlayers.filter(isWolfAligned).length;
+    const livingNeutral = livingPlayers.filter(p => p.role === 'JESTER' || (p.role === 'DOPPELGANGER' && !p.doppelgangerCopied)).length;
+
+    const totalLiving = livingPlayers.length || 1;
+    const goodPct = (livingGood / totalLiving) * 100;
+    const evilPct = (livingEvil / totalLiving) * 100;
+    const neutralPct = (livingNeutral / totalLiving) * 100;
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-start">
+        <div className="bg-slate-900 border-r border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-5 space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <span>📊 Moderator Dashboard</span>
+            </h3>
+            <button onClick={() => setShowDashboardDrawer(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Kekuatan Kubu (Health Bar)</span>
+            <div className="w-full h-4 bg-slate-900 rounded-full overflow-hidden flex border border-slate-800 p-0.5">
+              <div style={{ width: `${goodPct}%` }} className="bg-emerald-500 h-full transition-all duration-500 rounded-l-full" title="Tim Warga" />
+              <div style={{ width: `${evilPct}%` }} className="bg-red-500 h-full transition-all duration-500" title="Tim Evil" />
+              <div style={{ width: `${neutralPct}%` }} className="bg-pink-500 h-full transition-all duration-500 rounded-r-full" title="Netral" />
+            </div>
+            <div className="flex justify-between text-xs font-bold pt-1">
+              <span className="text-emerald-400">🏘️ Warga: {livingGood}</span>
+              <span className="text-red-400">🐺 Evil: {livingEvil}</span>
+              {livingNeutral > 0 && <span className="text-pink-400">🃏 Netral: {livingNeutral}</span>}
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Role Ability Tracker</span>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span>🧪 Witch Heal Potion</span>
+                <span className={`font-bold px-2 py-0.5 rounded ${gameState.witchHealUsed ? 'bg-red-950 text-red-400' : 'bg-emerald-950 text-emerald-400'}`}>
+                  {gameState.witchHealUsed ? 'TERPAKAI (0/1)' : 'TERSEDIA (1/1)'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span>☠️ Witch Kill Potion</span>
+                <span className={`font-bold px-2 py-0.5 rounded ${gameState.witchKillUsed ? 'bg-red-950 text-red-400' : 'bg-emerald-950 text-emerald-400'}`}>
+                  {gameState.witchKillUsed ? 'TERPAKAI (0/1)' : 'TERSEDIA (1/1)'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span>⭐ Sheriff Ability</span>
+                <span className={`font-bold px-2 py-0.5 rounded ${gameState.sheriffUsed ? 'bg-red-950 text-red-400' : 'bg-emerald-950 text-emerald-400'}`}>
+                  {gameState.sheriffUsed ? 'TERPAKAI (0/1)' : 'TERSEDIA (1/1)'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span>👑 Mayor Reveal</span>
+                <span className={`font-bold px-2 py-0.5 rounded ${gameState.mayorRevealed ? 'bg-amber-950 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
+                  {gameState.mayorRevealed ? 'AKTIF (2 Suara)' : 'BELUM AKTIF'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-2 text-xs text-slate-300">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Status Sesi:</span>
+              <span className="font-bold text-white">Malam {gameState.nightNumber} / Hari {gameState.dayNumber}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Pemain Hidup / Mati:</span>
+              <span className="font-bold text-white">{livingPlayers.length} Hidup · {deadPlayers.length} Mati</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderToast = () => {
@@ -1462,6 +1632,14 @@ export default function App() {
 
           <div className="flex items-center gap-1.5">
             <button
+              onClick={() => setShowDashboardDrawer(true)}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition"
+              title="Dashboard Moderator"
+            >
+              📊
+            </button>
+
+            <button
               onClick={handleBackToHome}
               className="p-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 transition"
               title="Kembali ke Halaman Awal"
@@ -1570,7 +1748,34 @@ export default function App() {
             <Users className="w-6 h-6 text-amber-400" />
             <span>SETUP PEMAIN</span>
           </h2>
-          <p className="text-xs text-slate-400">Pilih peserta dari daftar untuk memulai.</p>
+          <p className="text-xs text-slate-400">Pilih preset cepat atau atur peserta manual.</p>
+        </div>
+
+        {/* Game Presets */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">⚡ Game Presets (Pilih Cepat)</h3>
+            <span className="text-[10px] text-slate-500">Atur otomatis</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {GAME_PRESETS.map(preset => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyGamePreset(preset)}
+                className="p-3 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 hover:border-amber-500/50 text-left transition space-y-1 group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-400 group-hover:text-amber-300">{preset.name}</span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                    {preset.count} Pemain
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">{preset.desc}</p>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
@@ -1941,7 +2146,6 @@ export default function App() {
 
   const renderNightGuardian = () => {
     const livingPlayers = gameState.players.filter(p => p.alive);
-    const selectedTarget = gameState.players.find(p => p.id === gameState.guardianTargetId);
 
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
@@ -2328,6 +2532,18 @@ export default function App() {
       voteTally[targetId] = (voteTally[targetId] || 0) + weight;
     });
 
+    const sortedCandidates = Object.entries(voteTally)
+      .map(([targetId, count]) => ({
+        player: gameState.players.find(p => p.id === targetId),
+        count
+      }))
+      .filter(item => item.player)
+      .sort((a, b) => b.count - a.count);
+
+    const maxVotes = sortedCandidates.length > 0 ? sortedCandidates[0].count : 0;
+    const topCandidates = sortedCandidates.filter(c => c.count === maxVotes && maxVotes > 0);
+    const isTie = topCandidates.length > 1;
+
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
         <div className="text-center space-y-2">
@@ -2338,7 +2554,11 @@ export default function App() {
         </div>
 
         <div className="space-y-2">
-          {livingMayor && !gameState.mayorRevealed && <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 text-slate-950 font-black text-sm">👑 UNGKAP IDENTITAS MAYOR</button>}
+          {livingMayor && !gameState.mayorRevealed && (
+            <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 text-slate-950 font-black text-sm">
+              👑 UNGKAP IDENTITAS MAYOR
+            </button>
+          )}
         </div>
 
         {!isAllVotesDone && currentVoter ? (
@@ -2367,19 +2587,44 @@ export default function App() {
           </div>
         ) : (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-2xl">
-            <h3 className="text-lg font-bold text-white text-center">HASIL VOTING TERKUMPUL</h3>
-            <div className="space-y-2">
-              {Object.entries(voteTally).length === 0 ? (
+            <h3 className="text-lg font-bold text-white text-center">HASIL REKAP VOTING</h3>
+
+            {isTie && (
+              <div className="p-3 bg-amber-950/80 border border-amber-600 rounded-2xl text-amber-200 text-xs text-center font-bold">
+                ⚠️ HASIL SERI: {topCandidates.map(c => c.player.name).join(' & ')} memperoleh suara terbanyak yang sama ({maxVotes} suara).
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {sortedCandidates.length === 0 ? (
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center text-sm text-slate-400">
-                  Semua memilih skip / tidak ada suara.
+                  Semua pemain memilih skip vote. Tidak ada pemain yang tereliminasi.
                 </div>
               ) : (
-                Object.entries(voteTally).map(([targetId, count]) => (
-                  <div key={targetId} className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="font-bold text-white">{gameState.players.find(p => p.id === targetId)?.name}</span>
-                    <span className="px-3 py-1 bg-red-950 text-red-300 border border-red-800 rounded-full font-black text-xs">{count} Suara</span>
-                  </div>
-                ))
+                sortedCandidates.map(({ player, count }) => {
+                  const isTop = count === maxVotes && maxVotes > 0;
+                  const percentage = Math.min(100, (count / livingPlayers.length) * 100);
+
+                  return (
+                    <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500' : 'bg-slate-950 border-slate-800'}`}>
+                      <div className="flex justify-between items-center text-sm font-bold">
+                        <span className={isTop ? 'text-red-400 font-extrabold' : 'text-white'}>
+                          {player.name} {isTop && '🔥'}
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs ${isTop ? 'bg-red-600 text-white font-black' : 'bg-slate-800 text-slate-400'}`}>
+                          {count} Suara
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 rounded-full ${isTop ? 'bg-gradient-to-r from-red-600 to-amber-500' : 'bg-slate-600'}`}
+                          style={{ width: `${Math.max(8, percentage)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -2479,7 +2724,9 @@ export default function App() {
       {renderRulesModal()}
       {renderRoleListDrawer()}
       {renderGameLogDrawer()}
+      {renderModeratorDashboard()}
       {renderHeader()}
+      {renderNightTimeline()}
       <main className="flex-1 pb-8">{renderCurrentPhase()}</main>
     </div>
   );
