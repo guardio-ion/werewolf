@@ -2138,9 +2138,20 @@ export default function App() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
           {candidates.map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, sheriffTargetId: p.id }))} className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950 border-yellow-500 text-yellow-200' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
         </div>
-        <div className="flex gap-3">
-          <button onClick={handleSkipSheriff} className="w-1/3 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700">SKIP</button>
-          <button onClick={handleConfirmSheriff} className="w-2/3 py-4 rounded-2xl bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black flex items-center justify-center gap-2"><span>KONFIRMASI AKSI SHERIFF</span><ArrowRight className="w-5 h-5" /></button>
+        <div className="space-y-3 pt-2">
+          <button
+            onClick={handleSkipSheriff}
+            className="w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-base border-2 border-slate-600 transition"
+          >
+            ⏭️ SKIP SHERIFF — TIDAK MENGGUNAKAN KEMAMPUAN
+          </button>
+          <button
+            onClick={handleConfirmSheriff}
+            disabled={!gameState.sheriffTargetId}
+            className={`w-full py-4 rounded-2xl font-black flex items-center justify-center gap-2 transition ${gameState.sheriffTargetId ? 'bg-yellow-600 hover:bg-yellow-500 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
+          >
+            <span>KONFIRMASI AKSI SHERIFF</span><ArrowRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
     );
