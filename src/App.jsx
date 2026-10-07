@@ -2166,16 +2166,20 @@ export default function App() {
         <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-yellow-950 border border-yellow-700 text-yellow-300"><Award className="w-8 h-8" /></div><h2 className="text-2xl font-bold text-yellow-300">⭐ SHERIFF PHASE</h2><p className="text-sm text-slate-300">Sekali per game, Sheriff memilih 1 pemain. Jika target adalah Werewolf, target tereliminasi dan Sheriff selamat. Jika target bukan Werewolf, Sheriff tereliminasi.</p></div>
         <div className="bg-yellow-950/50 border border-yellow-800 rounded-2xl p-4 text-center text-xs text-yellow-200">Lycan dan Cultist <strong>bukan</strong> target benar. Hanya role Werewolf yang dianggap jawaban benar.</div>
         {selected && <div className="bg-slate-900 border border-yellow-700 rounded-2xl p-4 text-center"><span className="text-xs font-bold text-yellow-300">TARGET TERPILIH</span><div className="text-xl font-black text-white mt-1">{selected.name}</div></div>}
+
+        <button
+          type="button"
+          onClick={handleSkipSheriff}
+          className="w-full py-4 px-4 rounded-2xl bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white font-black text-base border-2 border-slate-500 shadow-lg transition flex items-center justify-center gap-2"
+        >
+          <span className="text-xl">⏭️</span>
+          <span>SKIP SHERIFF</span>
+        </button>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
           {candidates.map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, sheriffTargetId: p.id }))} className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950 border-yellow-500 text-yellow-200' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
         </div>
         <div className="space-y-3 pt-2">
-          <button
-            onClick={handleSkipSheriff}
-            className="w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-base border-2 border-slate-600 transition"
-          >
-            ⏭️ SKIP SHERIFF — TIDAK MENGGUNAKAN KEMAMPUAN
-          </button>
           <button
             onClick={handleConfirmSheriff}
             disabled={!gameState.sheriffTargetId}
