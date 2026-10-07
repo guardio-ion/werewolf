@@ -56,7 +56,7 @@ const ROLES = {
   PRIEST: { name: 'Priest', team: 'Warga', icon: '✝️', color: 'text-violet-300', bg: 'bg-violet-950/90', border: 'border-violet-600', accent: 'from-violet-900 to-violet-950', desc: 'Sekali per game pada siang hari dapat memberkati 1 pemain. Pemain tersebut mendapat perlindungan dari serangan Werewolf pada malam berikutnya.' },
   WITCH: { name: 'Witch', team: 'Warga', icon: '🧪', color: 'text-purple-400', bg: 'bg-purple-950/90', border: 'border-purple-600', accent: 'from-purple-900 to-purple-950', desc: 'Memiliki Heal Potion dan Kill Potion, masing-masing hanya 1x. Witch tidak melihat korban Werewolf dan harus menebak target Heal secara blind.' },
   JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Menang sendiri jika berhasil tereliminasi melalui voting siang hari.' },
-  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600', accent: 'from-indigo-900 to-indigo-950', desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger mengambil role target tersebut dan mulai memakai kemampuan role itu.' }
+  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600', accent: 'from-indigo-900 to-indigo-950', desc: 'Malam 1 memilih 1 target. Jika target mati karena malam, voting, atau efek Lovers, Doppelganger menggantikan role-nya dengan role target tersebut dan mulai memakai kemampuan role itu.' }
 };
 
 const ROLE_KEYS = Object.keys(ROLES);
@@ -109,6 +109,7 @@ function createInitialGameState() {
     priestBlessedId: null,
     doppelgangerTargetId: null,
     doppelgangerCopied: false,
+    doppelgangerRoleChangeNotice: null,
     mayorRevealed: false,
     seerTargetId: null,
     seerResult: null,
@@ -524,16 +525,9 @@ export default function App() {
       priestProtectedThisNight: false
     }));
 
-    // Doppelganger copies a target's role when that target dies.
-    const doppel = updatedPlayers.find(p => p.role === 'DOPPELGANGER' && p.alive && p.doppelgangerTargetId);
-    if (doppel && !doppel.doppelgangerCopied) {
-      const target = updatedPlayers.find(p => p.id === doppel.doppelgangerTargetId);
-      if (target && !target.alive) {
-        const idx = updatedPlayers.findIndex(p => p.id === doppel.id);
-        updatedPlayers[idx] = { ...updatedPlayers[idx], role: target.role, doppelgangerCopied: true };
-        log = addLog(log, night, day, 'ACTION', `Doppelganger menyalin role ${ROLES[target.role]?.name || target.role} dari ${target.name}.`);
-      }
-    }
+    // Doppelganger activates whenever their chosen target dies, including night deaths.
+    let doppelgangerRoleChangeNotice = null;
+    ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, night, day));
 
     const tempState = {
       ...state,
@@ -541,6 +535,7 @@ export default function App() {
       gameLog: log,
       lastNightDeaths: nightDeathsList,
       loverDeathNotice,
+      doppelgangerRoleChangeNotice,
       werewolfTargetId: null,
       guardianTargetId: null,
       doctorTargetId: null,
@@ -674,19 +669,64 @@ export default function App() {
     triggerToast(`${mayor.name} sekarang memiliki 2 suara dalam voting.`);
   };
 
-  const handleVoteSubmit = (voterId, targetId) => {
+  const handleVoteSubmit = (voterId, targetId = null) => {
     setGameState(prev => {
       const newVotes = { ...prev.votes, [voterId]: targetId };
-      const livingPlayers = prev.players.filter(p => p.alive);
       const nextVoterIndex = prev.currentVoterIndex + 1;
+      const voter = prev.players.find(p => p.id === voterId);
+      const voteLog = targetId
+        ? `🗳️ ${voter?.name || 'Pemain'} memberikan suara.`
+        : `⏭️ ${voter?.name || 'Pemain'} memilih SKIP VOTE.`;
 
       return {
         ...prev,
         undoStack: pushUndoState(prev),
         votes: newVotes,
-        currentVoterIndex: nextVoterIndex
+        currentVoterIndex: nextVoterIndex,
+        gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', voteLog)
       };
     });
+  };
+
+  // Doppelganger permanently replaces their role with the target's role
+  // once the selected target has died, regardless of how the target died.
+  const applyDoppelgangerRoleIfTargetDead = (players, log, nightNumber, dayNumber) => {
+    const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && p.doppelgangerTargetId && !p.doppelgangerCopied);
+    if (!doppel) return { players, log, notice: null };
+
+    const target = players.find(p => p.id === doppel.doppelgangerTargetId);
+    if (!target || target.alive) return { players, log, notice: null };
+
+    const idx = players.findIndex(p => p.id === doppel.id);
+    if (idx === -1) return { players, log, notice: null };
+
+    const oldRole = doppel.role;
+    const copiedRole = target.role;
+    const updatedPlayers = [...players];
+    updatedPlayers[idx] = {
+      ...updatedPlayers[idx],
+      role: copiedRole,
+      doppelgangerCopied: true
+    };
+
+    const updatedLog = addLog(
+      log,
+      nightNumber,
+      dayNumber,
+      'ACTION',
+      `🎭 Doppelganger ${doppel.name} menggantikan role ${target.name} dan sekarang menjadi ${ROLES[copiedRole]?.name || copiedRole}.`
+    );
+
+    return {
+      players: updatedPlayers,
+      log: updatedLog,
+      notice: {
+        playerName: doppel.name,
+        targetName: target.name,
+        oldRole,
+        newRole: copiedRole
+      }
+    };
   };
 
   const resolveVotingResults = () => {
@@ -697,7 +737,7 @@ export default function App() {
     const voteCounts = {};
     Object.entries(votes).forEach(([voterId, targetId]) => {
       const voter = players.find(p => p.id === voterId && p.alive);
-      if (!voter) return;
+      if (!voter || !targetId) return; // SKIP VOTE does not add a vote to any candidate
       const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1;
       voteCounts[targetId] = (voteCounts[targetId] || 0) + weight;
     });
@@ -762,6 +802,11 @@ export default function App() {
         }
       });
 
+      // If the Doppelganger's target was eliminated by voting (or the Lovers chain),
+      // copy that role before evaluating the next win condition.
+      let doppelgangerRoleChangeNotice = null;
+      ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, nightNumber, dayNumber));
+
       const eliminatedWasJester = eliminatedPlayer?.role === 'JESTER';
       if (eliminatedWasJester) {
         log = addLog(log, nightNumber, dayNumber, 'WIN', `Jester ${eliminatedPlayer.name} berhasil tereliminasi lewat voting dan menang!`);
@@ -771,12 +816,16 @@ export default function App() {
           gameLog: log,
           lastDayDeaths: dayDeaths,
           loverDeathNotice,
+          doppelgangerRoleChangeNotice,
           currentPhase: 'GAME_OVER',
           winner: 'JESTER'
         };
         setGameState(jesterState);
         return;
       }
+    } else if (maxVotes === 0) {
+      // Everyone skipped (or there were no valid votes).
+      log = addLog(log, nightNumber, dayNumber, 'INFO', `Semua pemain memilih SKIP VOTE. Tidak ada pemain yang tereliminasi.`);
     } else {
       // Tie vote
       log = addLog(log, nightNumber, dayNumber, 'INFO', `Hasil voting seri! Tidak ada pemain yang tereliminasi.`);
@@ -787,7 +836,8 @@ export default function App() {
       players: updatedPlayers,
       gameLog: log,
       lastDayDeaths: dayDeaths,
-      loverDeathNotice
+      loverDeathNotice,
+      doppelgangerRoleChangeNotice
     };
 
     const winResult = checkWinConditions(tempState);
@@ -2186,7 +2236,7 @@ export default function App() {
     const voteTally = {};
     Object.entries(votes).forEach(([voterId, targetId]) => {
       const voter = gameState.players.find(p => p.id === voterId && p.alive);
-      if (!voter) return;
+      if (!voter || !targetId) return; // SKIP VOTE is not counted
       const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1;
       voteTally[targetId] = (voteTally[targetId] || 0) + weight;
     });
@@ -2230,11 +2280,24 @@ export default function App() {
                   </button>
                 ))}
             </div>
+
+            <button
+              onClick={() => handleVoteSubmit(currentVoter.id, null)}
+              className="w-full py-3 rounded-2xl border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-sm flex items-center justify-center gap-2 transition"
+            >
+              <span>⏭️ SKIP VOTE</span>
+            </button>
+            <p className="text-[11px] text-center text-slate-500">Skip Vote = tidak memberikan suara kepada siapa pun.</p>
           </div>
         ) : (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-2xl">
             <h3 className="text-lg font-bold text-white text-center">HASIL VOTING TERKUMPUL</h3>
             <div className="space-y-2">
+              {Object.entries(voteTally).length === 0 && (
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center text-sm text-slate-400">
+                  Semua pemain memilih skip / belum ada suara masuk. Tidak ada pemain yang akan tereliminasi.
+                </div>
+              )}
               {Object.entries(voteTally).map(([targetId, count]) => {
                 const targetName = gameState.players.find(p => p.id === targetId)?.name;
                 return (
@@ -2333,6 +2396,54 @@ export default function App() {
     );
   };
 
+  const renderDoppelgangerRoleChangeNotice = () => {
+    const notice = gameState.doppelgangerRoleChangeNotice;
+    if (!notice) return null;
+
+    const newRole = ROLES[notice.newRole] || { name: notice.newRole, icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/80', border: 'border-indigo-600' };
+
+    return (
+      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
+        <div className="w-full max-w-md rounded-3xl border border-indigo-500/60 bg-slate-900 shadow-2xl shadow-indigo-950/60 overflow-hidden">
+          <div className="p-6 text-center space-y-5">
+            <div className="mx-auto w-20 h-20 rounded-full bg-indigo-950 border border-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-950">
+              <span className="text-5xl">🎭</span>
+            </div>
+            <div>
+              <div className="text-xs font-black tracking-[0.2em] text-indigo-400 uppercase">DOPPELGANGER AKTIF</div>
+              <h2 className="text-2xl font-black text-white mt-2">Peranmu telah berubah!</h2>
+              <p className="text-sm text-slate-400 mt-2">Target yang kamu pilih, <strong className="text-white">{notice.targetName}</strong>, telah mati.</p>
+            </div>
+
+            <div className="flex items-center justify-center gap-3">
+              <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950 p-4">
+                <div className="text-xs text-slate-500 uppercase font-bold">Sebelumnya</div>
+                <div className="text-lg font-black text-slate-300 mt-1">🎭 Doppelganger</div>
+              </div>
+              <ArrowRight className="w-6 h-6 text-indigo-400 shrink-0" />
+              <div className={`flex-1 rounded-2xl border ${newRole.border} ${newRole.bg} p-4`}>
+                <div className="text-xs text-indigo-300 uppercase font-bold">Sekarang</div>
+                <div className={`text-lg font-black ${newRole.color} mt-1`}>{newRole.icon} {newRole.name}</div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-indigo-950/50 border border-indigo-800/60 p-4 text-sm text-indigo-100">
+              Mulai sekarang <strong>{notice.playerName}</strong> menggunakan kemampuan dan kondisi kemenangan dari role <strong>{newRole.name}</strong>.
+            </div>
+
+            <button
+              onClick={() => setGameState(prev => ({ ...prev, doppelgangerRoleChangeNotice: null }))}
+              className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black transition flex items-center justify-center gap-2"
+            >
+              <Check className="w-5 h-5" />
+              <span>PAHAM, LANJUTKAN</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderCurrentPhase = () => {
     switch (gameState.currentPhase) {
       case 'HOME':
@@ -2377,6 +2488,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950 flex flex-col">
       {renderToast()}
+      {renderDoppelgangerRoleChangeNotice()}
       {renderLoverDeathNotice()}
       {renderConfirmModal()}
       {renderRulesModal()}
