@@ -733,7 +733,7 @@ export default function App() {
     let log = [...gameState.gameLog];
     const { votes, players, nightNumber, dayNumber } = gameState;
 
-    // Calculate vote count per living candidate
+    // Calculate vote count per living candidate. null/undefined/empty targets are SKIP VOTE.
     const voteCounts = {};
     Object.entries(votes).forEach(([voterId, targetId]) => {
       const voter = players.find(p => p.id === voterId && p.alive);
@@ -747,7 +747,12 @@ export default function App() {
       if (cnt > maxVotes) maxVotes = cnt;
     });
 
-    const topCandidates = Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes);
+    const topCandidates = maxVotes > 0
+      ? Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes)
+      : [];
+
+    const validVoteCount = Object.values(votes).filter(Boolean).length;
+    const allVotesSkipped = validVoteCount === 0;
 
     let updatedPlayers = players.map(p => ({ ...p }));
     let dayDeaths = [];
@@ -823,9 +828,9 @@ export default function App() {
         setGameState(jesterState);
         return;
       }
-    } else if (maxVotes === 0) {
-      // Everyone skipped (or there were no valid votes).
-      log = addLog(log, nightNumber, dayNumber, 'INFO', `Semua pemain memilih SKIP VOTE. Tidak ada pemain yang tereliminasi.`);
+    } else if (allVotesSkipped) {
+      // Every voter selected Skip Vote. No candidate is eliminated.
+      log = addLog(log, nightNumber, dayNumber, 'INFO', `⏭️ Semua pemain memilih SKIP VOTE. Tidak ada pemain yang tereliminasi.`);
     } else {
       // Tie vote
       log = addLog(log, nightNumber, dayNumber, 'INFO', `Hasil voting seri! Tidak ada pemain yang tereliminasi.`);
@@ -2230,7 +2235,7 @@ export default function App() {
     const { currentVoterIndex, votes } = gameState;
     const currentVoter = livingPlayers[currentVoterIndex];
 
-    const isAllVotesDone = currentVoterIndex >= livingPlayers.length;
+    const isAllVotesDone = currentVoterIndex >= livingPlayers.length || Object.keys(votes).length >= livingPlayers.length;
 
     // Tally vote counts for preview
     const voteTally = {};
