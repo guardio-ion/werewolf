@@ -49,3 +49,24 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 1);
 }
+
+
+/* Hormati preferensi reduced motion tanpa mengubah game state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus keyboard yang tetap terlihat pada tombol/input. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
