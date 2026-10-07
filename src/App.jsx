@@ -529,7 +529,7 @@ export default function App() {
 
     // Doppelganger activates whenever their chosen target dies, including night deaths.
     let doppelgangerRoleChangeNotice = null;
-    ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, night, day));
+    ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, night, day, state.doppelgangerTargetId));
 
     const tempState = {
       ...state,
@@ -708,11 +708,12 @@ export default function App() {
 
   // Doppelganger permanently replaces their role with the target's role
   // once the selected target has died, regardless of how the target died.
-  const applyDoppelgangerRoleIfTargetDead = (players, log, nightNumber, dayNumber) => {
-    const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && p.doppelgangerTargetId && !p.doppelgangerCopied);
-    if (!doppel) return { players, log, notice: null };
+  const applyDoppelgangerRoleIfTargetDead = (players, log, nightNumber, dayNumber, targetId = null) => {
+    // Target Doppelganger disimpan di gameState.doppelgangerTargetId, bukan di objek player.
+    const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
+    if (!doppel || !targetId) return { players, log, notice: null };
 
-    const target = players.find(p => p.id === doppel.doppelgangerTargetId);
+    const target = players.find(p => p.id === targetId);
     if (!target || target.alive) return { players, log, notice: null };
 
     const idx = players.findIndex(p => p.id === doppel.id);
@@ -828,7 +829,7 @@ export default function App() {
 
       // If the Doppelganger's target was eliminated by voting (or the Lovers chain),
       // copy that role before evaluating the next win condition.
-      ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, nightNumber, dayNumber));
+      ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, nightNumber, dayNumber, gameState.doppelgangerTargetId));
 
       const eliminatedWasJester = eliminatedPlayer?.role === 'JESTER';
       if (eliminatedWasJester) {
