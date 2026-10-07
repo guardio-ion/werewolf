@@ -35,53 +35,29 @@ import {
 const LOCAL_STORAGE_KEY = 'WEREWOLF_MODERATOR_ASSISTANT_STATE_V3';
 
 const ROLES = {
-  WARGA: { name: 'Warga', team: 'Warga', icon: '👨', color: 'text-slate-300', bg: 'bg-slate-800/90', border: 'border-slate-600', accent: 'from-slate-700 to-slate-900', desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi seluruh ancaman.' },
-  WEREWOLF: { name: 'Werewolf', team: 'Evil', icon: '🐺', color: 'text-red-400', bg: 'bg-red-950/90', border: 'border-red-600', accent: 'from-red-900 to-red-950', desc: 'Setiap malam memilih 1 korban. Sesama Werewolf saling mengetahui.' },
-  LYCAN: { name: 'Lycan', team: 'Warga', icon: '🌙', color: 'text-slate-200', bg: 'bg-zinc-800/90', border: 'border-zinc-500', accent: 'from-zinc-700 to-zinc-900', desc: 'Berada di tim Warga dan tidak memiliki aksi malam. Seer akan melihat Lycan sebagai Werewolf.' },
-  SEER: { name: 'Seer', team: 'Warga', icon: '🔮', color: 'text-cyan-400', bg: 'bg-cyan-950/90', border: 'border-cyan-600', accent: 'from-cyan-900 to-cyan-950', desc: 'Setiap malam memeriksa 1 pemain untuk mengetahui wujud/perannya. Lycan terlihat sebagai Werewolf.' },
-  GUARDIAN: { name: 'Guardian', team: 'Warga', icon: '🛡️', color: 'text-blue-400', bg: 'bg-blue-950/90', border: 'border-blue-600', accent: 'from-blue-900 to-blue-950', desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak boleh melindungi pemain yang sama dua malam berturut-turut.' },
-  CUPID: { name: 'Cupid', team: 'Warga', icon: '💘', color: 'text-pink-400', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.' },
-  MAYOR: { name: 'Mayor', team: 'Warga', icon: '👑', color: 'text-amber-400', bg: 'bg-amber-950/90', border: 'border-amber-600', accent: 'from-amber-900 to-amber-950', desc: 'Sekali per game dapat mengungkapkan identitas sebagai Mayor. Setelah terungkap, bobot suaranya menjadi 2 pada voting.' },
-  SHERIFF: { name: 'Sheriff', team: 'Warga', icon: '⭐', color: 'text-yellow-300', bg: 'bg-yellow-950/90', border: 'border-yellow-600', accent: 'from-yellow-900 to-yellow-950', desc: 'Sekali per game, pada malam hari memilih 1 pemain untuk diuji. Jika target adalah Werewolf, target tereliminasi. Jika bukan, Sheriff tereliminasi.' },
-  HUNTER: { name: 'Hunter', team: 'Warga', icon: '🏹', color: 'text-orange-300', bg: 'bg-orange-950/90', border: 'border-orange-600', accent: 'from-orange-900 to-orange-950', desc: 'Jika mati, Hunter dapat memilih 1 pemain lain untuk dieliminasi sebagai balas dendam.' },
-  TRAITOR: { name: 'Traitor', team: 'Warga', icon: '🗡️', color: 'text-slate-200', bg: 'bg-slate-950/90', border: 'border-slate-500', accent: 'from-slate-700 to-slate-950', desc: 'Awalnya di kubu Warga. Jika seluruh Werewolf mati dan Traitor masih hidup, ia berubah menjadi Werewolf.' },
-  WOLF_CUB: { name: 'Wolf Cub', team: 'Evil', icon: '🐺', color: 'text-rose-300', bg: 'bg-rose-950/90', border: 'border-rose-600', accent: 'from-rose-900 to-rose-950', desc: 'Jika Wolf Cub mati, Werewolf mendapat amukan pada malam berikutnya dan dapat membunuh 2 pemain.' },
-  WITCH: { name: 'Witch', team: 'Warga', icon: '🧪', color: 'text-purple-400', bg: 'bg-purple-950/90', border: 'border-purple-600', accent: 'from-purple-900 to-purple-950', desc: 'Memiliki Heal Potion dan Kill Potion, masing-masing 1x. Witch tidak melihat korban Werewolf dan menebak secara blind.' },
-  JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600', accent: 'from-pink-900 to-pink-950', desc: 'Menang sendiri jika berhasil tereliminasi melalui voting siang hari.' },
-  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600', accent: 'from-indigo-900 to-indigo-950', desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger menggantikan role-nya.' }
+  WARGA: { name: 'Warga', team: 'Warga', icon: '👨', color: 'text-slate-300', bg: 'bg-slate-900/90', border: 'border-slate-700', accent: 'from-slate-800 to-slate-950', desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi seluruh ancaman.' },
+  WEREWOLF: { name: 'Werewolf', team: 'Evil', icon: '🐺', color: 'text-red-400', bg: 'bg-red-950/90', border: 'border-red-600/60', accent: 'from-red-900 via-red-950 to-slate-950', desc: 'Setiap malam memilih 1 korban. Sesama Werewolf saling mengetahui.' },
+  LYCAN: { name: 'Lycan', team: 'Warga', icon: '🌙', color: 'text-zinc-200', bg: 'bg-zinc-900/90', border: 'border-zinc-600', accent: 'from-zinc-800 to-slate-950', desc: 'Berada di tim Warga dan tidak memiliki aksi malam. Seer akan melihat Lycan sebagai Werewolf.' },
+  SEER: { name: 'Seer', team: 'Warga', icon: '🔮', color: 'text-cyan-400', bg: 'bg-cyan-950/90', border: 'border-cyan-600/60', accent: 'from-cyan-950 via-slate-900 to-slate-950', desc: 'Setiap malam memeriksa 1 pemain untuk mengetahui wujud/perannya. Lycan terlihat sebagai Werewolf.' },
+  GUARDIAN: { name: 'Guardian', team: 'Warga', icon: '🛡️', color: 'text-blue-400', bg: 'bg-blue-950/90', border: 'border-blue-600/60', accent: 'from-blue-950 via-slate-900 to-slate-950', desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak boleh melindungi pemain yang sama dua malam berturut-turut.' },
+  CUPID: { name: 'Cupid', team: 'Warga', icon: '💘', color: 'text-pink-400', bg: 'bg-pink-950/90', border: 'border-pink-600/60', accent: 'from-pink-950 via-slate-900 to-slate-950', desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.' },
+  MAYOR: { name: 'Mayor', team: 'Warga', icon: '👑', color: 'text-amber-400', bg: 'bg-amber-950/90', border: 'border-amber-600/60', accent: 'from-amber-950 via-slate-900 to-slate-950', desc: 'Sekali per game dapat mengungkapkan identitas sebagai Mayor. Setelah terungkap, bobot suaranya menjadi 2 pada voting.' },
+  SHERIFF: { name: 'Sheriff', team: 'Warga', icon: '⭐', color: 'text-yellow-300', bg: 'bg-yellow-950/90', border: 'border-yellow-600/60', accent: 'from-yellow-950 via-slate-900 to-slate-950', desc: 'Sekali per game, pada malam hari memilih 1 pemain untuk diuji. Jika target adalah Werewolf, target tereliminasi. Jika bukan, Sheriff tereliminasi.' },
+  HUNTER: { name: 'Hunter', team: 'Warga', icon: '🏹', color: 'text-orange-300', bg: 'bg-orange-950/90', border: 'border-orange-600/60', accent: 'from-orange-950 via-slate-900 to-slate-950', desc: 'Jika mati, Hunter dapat memilih 1 pemain lain untuk dieliminasi sebagai balas dendam.' },
+  TRAITOR: { name: 'Traitor', team: 'Warga', icon: '🗡️', color: 'text-slate-200', bg: 'bg-slate-900/90', border: 'border-slate-700', accent: 'from-slate-800 to-slate-950', desc: 'Awalnya di kubu Warga. Jika seluruh Werewolf mati dan Traitor masih hidup, ia berubah menjadi Werewolf.' },
+  WOLF_CUB: { name: 'Wolf Cub', team: 'Evil', icon: '🐺', color: 'text-rose-300', bg: 'bg-rose-950/90', border: 'border-rose-600/60', accent: 'from-rose-950 via-slate-900 to-slate-950', desc: 'Jika Wolf Cub mati, Werewolf mendapat amukan pada malam berikutnya dan dapat membunuh 2 pemain.' },
+  WITCH: { name: 'Witch', team: 'Warga', icon: '🧪', color: 'text-purple-400', bg: 'bg-purple-950/90', border: 'border-purple-600/60', accent: 'from-purple-950 via-slate-900 to-slate-950', desc: 'Memiliki Heal Potion dan Kill Potion, masing-masing 1x. Witch tidak melihat korban Werewolf dan menebak secara blind.' },
+  JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600/60', accent: 'from-pink-950 via-slate-900 to-slate-950', desc: 'Menang sendiri jika berhasil tereliminasi melalui voting siang hari.' },
+  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600/60', accent: 'from-indigo-950 via-slate-900 to-slate-950', desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger menggantikan role-nya.' }
 };
 
 const ROLE_KEYS = Object.keys(ROLES);
 
 const GAME_PRESETS = [
-  {
-    id: 'quick_8',
-    name: '⚡ Quick 8 Players',
-    desc: 'Permainan cepat & intens untuk grup kecil (8 Pemain).',
-    count: 8,
-    roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WARGA: 4 }
-  },
-  {
-    id: 'classic_10',
-    name: '📜 Classic 10 Players',
-    desc: 'Komposisi standar seimbang untuk 10 Pemain.',
-    count: 10,
-    roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WITCH: 1, WARGA: 5 }
-  },
-  {
-    id: 'balanced_12',
-    name: '🛡️ Balanced 12 Players',
-    desc: 'Pengalaman penuh dengan peran khusus untuk 12 Pemain.',
-    count: 12,
-    roles: { WEREWOLF: 3, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, WARGA: 4 }
-  },
-  {
-    id: 'chaos_15',
-    name: '🔥 Chaos 15 Players',
-    desc: 'Mode seru & menantang untuk grup besar (15 Pemain).',
-    count: 15,
-    roles: { WEREWOLF: 3, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, JESTER: 1, TRAITOR: 1, WARGA: 3 }
-  }
+  { id: 'quick_8', name: '⚡ Quick 8 Players', desc: 'Permainan cepat & intens untuk grup kecil (8 Pemain).', count: 8, roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WARGA: 4 } },
+  { id: 'classic_10', name: '📜 Classic 10 Players', desc: 'Komposisi standar seimbang untuk 10 Pemain.', count: 10, roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WITCH: 1, WARGA: 5 } },
+  { id: 'balanced_12', name: '🛡️ Balanced 12 Players', desc: 'Pengalaman penuh dengan peran khusus untuk 12 Pemain.', count: 12, roles: { WEREWOLF: 3, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, WARGA: 4 } },
+  { id: 'chaos_15', name: '🔥 Chaos 15 Players', desc: 'Mode seru & menantang untuk grup besar (15 Pemain).', count: 15, roles: { WEREWOLF: 3, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, JESTER: 1, TRAITOR: 1, WARGA: 3 } }
 ];
 
 function isWolfAligned(player) {
@@ -180,7 +156,7 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.error("Gagal memuat state dari localStorage:", e);
+      console.error("Gagal memuat state:", e);
     }
     return createInitialGameState();
   });
@@ -212,7 +188,7 @@ export default function App() {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
     } catch (e) {
-      console.error("Gagal menyimpan ke localStorage:", e);
+      console.error("Gagal menyimpan state:", e);
     }
   }, [gameState]);
 
@@ -227,18 +203,15 @@ export default function App() {
 
   useEffect(() => {
     if (gameState.currentPhase !== 'DISCUSSION') return;
-
     if (gameState.isTimerPaused && gameState.pausedRemainingSeconds !== null) {
       setRemainingSeconds(gameState.pausedRemainingSeconds);
       return;
     }
-
     if (!gameState.discussionEndTimestamp) return;
 
     const interval = setInterval(() => {
       const diff = Math.max(0, Math.ceil((gameState.discussionEndTimestamp - Date.now()) / 1000));
       setRemainingSeconds(diff);
-
       if (diff <= 0) {
         clearInterval(interval);
         triggerAutoTransitionToVoting();
@@ -264,14 +237,7 @@ export default function App() {
 
   function addLog(logs, nightNumber, dayNumber, type, message) {
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    return [{
-      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      timestamp: timeStr,
-      nightNumber,
-      dayNumber,
-      type,
-      message
-    }, ...logs];
+    return [{ id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), timestamp: timeStr, nightNumber, dayNumber, type, message }, ...logs];
   }
 
   function pushUndoState(state) {
@@ -295,13 +261,7 @@ export default function App() {
   const selectAllParticipants = () => {
     setInputPlayerNames([...PARTICIPANT_LIST]);
     setPlayerCount(PARTICIPANT_LIST.length);
-    setRoleCountsDraft({
-      WARGA: Math.max(0, PARTICIPANT_LIST.length - 4),
-      WEREWOLF: 1,
-      GUARDIAN: 1,
-      SEER: 1,
-      WITCH: 1
-    });
+    setRoleCountsDraft({ WARGA: Math.max(0, PARTICIPANT_LIST.length - 4), WEREWOLF: 1, GUARDIAN: 1, SEER: 1, WITCH: 1 });
   };
 
   const clearParticipants = () => {
@@ -320,12 +280,10 @@ export default function App() {
 
   const validateAndGenerateRoles = () => {
     const trimmed = inputPlayerNames.map(n => n.trim()).filter(Boolean);
-
     if (trimmed.length < 5 || trimmed.length > 20) {
       triggerToast('Pilih 5–20 peserta untuk memulai permainan.');
       return;
     }
-
     const totalRoles = Object.values(roleCountsDraft).reduce((sum, n) => sum + (Number(n) || 0), 0);
     if (totalRoles !== playerCount) {
       triggerToast(`Jumlah role harus tepat ${playerCount}. Saat ini ${totalRoles}.`);
@@ -358,38 +316,16 @@ export default function App() {
     }));
   };
 
-  const startRoleReveal = () => {
-    setGameState(prev => ({
-      ...prev,
-      currentPhase: 'ROLE_REVEAL',
-      revealPlayerIndex: 0,
-      isRoleCardOpen: false
-    }));
-  };
-
-  const toggleRoleCard = () => {
-    setGameState(prev => ({
-      ...prev,
-      isRoleCardOpen: !prev.isRoleCardOpen
-    }));
-  };
+  const startRoleReveal = () => setGameState(prev => ({ ...prev, currentPhase: 'ROLE_REVEAL', revealPlayerIndex: 0, isRoleCardOpen: false }));
+  const toggleRoleCard = () => setGameState(prev => ({ ...prev, isRoleCardOpen: !prev.isRoleCardOpen }));
 
   const nextRevealPlayer = () => {
     setGameState(prev => {
       const nextIndex = prev.revealPlayerIndex + 1;
       if (nextIndex >= prev.players.length) {
-        return {
-          ...prev,
-          currentPhase: 'NIGHT_INTRO',
-          nightNumber: 1,
-          gameLog: addLog(prev.gameLog, 1, 1, 'INFO', 'Pembagian role selesai. Memulai Malam 1.')
-        };
+        return { ...prev, currentPhase: 'NIGHT_INTRO', nightNumber: 1, gameLog: addLog(prev.gameLog, 1, 1, 'INFO', 'Pembagian role selesai. Memulai Malam 1.') };
       }
-      return {
-        ...prev,
-        revealPlayerIndex: nextIndex,
-        isRoleCardOpen: false
-      };
+      return { ...prev, revealPlayerIndex: nextIndex, isRoleCardOpen: false };
     });
   };
 
@@ -401,32 +337,26 @@ export default function App() {
       if (nightNumber === 1 && players.some(p => p.role === 'CUPID' && p.alive) && !cupidUsed && prev.currentPhase === 'NIGHT_INTRO') {
         return { ...prev, currentPhase: 'NIGHT_CUPID' };
       }
-
       const livingWerewolves = players.filter(p => isWolfAligned(p) && p.alive);
       if (livingWerewolves.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID')) {
         return { ...prev, currentPhase: 'NIGHT_WEREWOLF' };
       }
-
       const guardian = players.find(p => p.role === 'GUARDIAN' && p.alive);
       if (guardian && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
         return { ...prev, currentPhase: 'NIGHT_GUARDIAN' };
       }
-
       const sheriff = players.find(p => p.role === 'SHERIFF' && p.alive);
       if (sheriff && !prev.sheriffUsed && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
         return { ...prev, currentPhase: 'NIGHT_SHERIFF' };
       }
-
       const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
       if (doppel && nightNumber === 1 && !prev.doppelgangerTargetId && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
         return { ...prev, currentPhase: 'NIGHT_DOPPELGANGER' };
       }
-
       const seer = players.find(p => p.role === 'SEER' && p.alive);
       if (seer && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER')) {
         return { ...prev, currentPhase: 'NIGHT_SEER' };
       }
-
       const witch = players.find(p => p.role === 'WITCH' && p.alive);
       if (witch && (!prev.witchHealUsed || !prev.witchKillUsed) && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
         return { ...prev, currentPhase: 'NIGHT_WITCH' };
@@ -620,11 +550,7 @@ export default function App() {
     setGameState(prev => ({
       ...prev,
       seerTargetId: targetId,
-      seerResult: {
-        targetName: target.name,
-        displayedRole,
-        isLycanNote
-      },
+      seerResult: { targetName: target.name, displayedRole, isLycanNote },
       gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Seer meramal ${target.name}.`)
     }));
   };
@@ -635,7 +561,6 @@ export default function App() {
       triggerToast('Pilih dua pemain berbeda untuk menjadi pasangan.');
       return;
     }
-
     const p1 = players.find(p => p.id === cupidLover1Id);
     const p2 = players.find(p => p.id === cupidLover2Id);
 
@@ -663,32 +588,20 @@ export default function App() {
     const targetId = gameState.doppelgangerTargetId;
     const target = gameState.players.find(p => p.id === targetId && p.alive && p.role !== 'DOPPELGANGER');
     if (!target) { triggerToast('Pilih satu target hidup untuk Doppelganger.'); return; }
-    setGameState(prev => ({
-      ...prev,
-      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Doppelganger memilih ${target.name} sebagai target.`)
-    }));
+    setGameState(prev => ({ ...prev, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Doppelganger memilih ${target.name} sebagai target.`) }));
     advanceNightPhase();
   };
 
   const handleConfirmSheriff = () => {
     if (!gameState.sheriffTargetId) { triggerToast('Pilih target Sheriff terlebih dahulu, atau tekan SKIP.'); return; }
-    setGameState(prev => ({
-      ...prev,
-      sheriffUsed: true,
-      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Sheriff menggunakan kemampuan malam pada pemain terpilih.`)
-    }));
-    triggerToast('Aksi Sheriff dikonfirmasi. Sheriff silakan tutup mata.');
+    setGameState(prev => ({ ...prev, sheriffUsed: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Sheriff menggunakan kemampuan malam pada pemain terpilih.`) }));
+    triggerToast('Aksi Sheriff dikonfirmasi.');
     advanceNightPhase();
   };
 
   const handleSkipSheriff = () => {
-    setGameState(prev => ({
-      ...prev,
-      sheriffUsed: true,
-      sheriffTargetId: null,
-      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Sheriff memilih SKIP. Tidak ada pemeriksaan malam ini.')
-    }));
-    triggerToast('Sheriff memilih SKIP. Sheriff silakan tutup mata.');
+    setGameState(prev => ({ ...prev, sheriffUsed: true, sheriffTargetId: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Sheriff memilih SKIP.') }));
+    triggerToast('Sheriff memilih SKIP.');
     advanceNightPhase();
   };
 
@@ -716,34 +629,18 @@ export default function App() {
       tempState = activateTraitorIfNeeded(tempState);
       const winner = checkWinConditions(tempState);
 
-      if (winner) {
-        return { ...tempState, currentPhase: 'GAME_OVER', winner };
-      }
+      if (winner) return { ...tempState, currentPhase: 'GAME_OVER', winner };
+      if (prev.lastNightDeaths && prev.lastNightDeaths.length > 0) return { ...tempState, currentPhase: 'MORNING' };
 
-      if (prev.lastNightDeaths && prev.lastNightDeaths.length > 0) {
-        return { ...tempState, currentPhase: 'MORNING' };
-      }
-
-      return {
-        ...tempState,
-        currentPhase: 'NIGHT_INTRO',
-        nightNumber: prev.nightNumber + 1,
-        dayNumber: prev.dayNumber + 1,
-        votes: {},
-        currentVoterIndex: 0
-      };
+      return { ...tempState, currentPhase: 'NIGHT_INTRO', nightNumber: prev.nightNumber + 1, dayNumber: prev.dayNumber + 1, votes: {}, currentVoterIndex: 0 };
     });
   };
 
   const handleMayorReveal = () => {
     const mayor = gameState.players.find(p => p.role === 'MAYOR' && p.alive);
     if (!mayor || gameState.mayorRevealed) return;
-    setGameState(prev => ({
-      ...prev,
-      mayorRevealed: true,
-      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkapkan identitas. Suaranya menjadi bernilai 2.`)
-    }));
-    triggerToast(`${mayor.name} sekarang memiliki 2 suara dalam voting.`);
+    setGameState(prev => ({ ...prev, mayorRevealed: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkapkan identitas. Suaranya bernilai 2.`) }));
+    triggerToast(`${mayor.name} sekarang memiliki 2 suara.`);
   };
 
   const handleVoteSubmit = (voterId, targetId = null) => {
@@ -751,9 +648,7 @@ export default function App() {
       const newVotes = { ...prev.votes, [voterId]: targetId };
       const nextVoterIndex = prev.currentVoterIndex + 1;
       const voter = prev.players.find(p => p.id === voterId);
-      const voteLog = targetId
-        ? `🗳️ ${voter?.name || 'Pemain'} memberikan suara.`
-        : `⏭️ ${voter?.name || 'Pemain'} memilih SKIP VOTE.`;
+      const voteLog = targetId ? `🗳️ ${voter?.name || 'Pemain'} memberikan suara.` : `⏭️ ${voter?.name || 'Pemain'} memilih SKIP VOTE.`;
 
       return {
         ...prev,
@@ -768,17 +663,11 @@ export default function App() {
   const resetDoppelgangerAbilityState = (state, copiedRole) => {
     const next = { ...state };
     switch (copiedRole) {
-      case 'SHERIFF':
-        next.sheriffUsed = false; next.sheriffTargetId = null; break;
-      case 'MAYOR':
-        next.mayorRevealed = false; break;
-      case 'WITCH':
-        next.witchHealUsed = false; next.witchKillUsed = false;
-        next.witchHealUsedThisNight = false; next.witchHealTargetId = null; next.witchKillTargetId = null; break;
-      case 'CUPID':
-        next.cupidUsed = false; next.cupidLover1Id = null; next.cupidLover2Id = null; break;
-      default:
-        break;
+      case 'SHERIFF': next.sheriffUsed = false; next.sheriffTargetId = null; break;
+      case 'MAYOR': next.mayorRevealed = false; break;
+      case 'WITCH': next.witchHealUsed = false; next.witchKillUsed = false; next.witchHealUsedThisNight = false; next.witchHealTargetId = null; next.witchKillTargetId = null; break;
+      case 'CUPID': next.cupidUsed = false; next.cupidLover1Id = null; next.cupidLover2Id = null; break;
+      default: break;
     }
     return next;
   };
@@ -796,30 +685,10 @@ export default function App() {
     const oldRole = doppel.role;
     const copiedRole = target.role;
     const updatedPlayers = [...players];
-    updatedPlayers[idx] = {
-      ...updatedPlayers[idx],
-      role: copiedRole,
-      doppelgangerCopied: true
-    };
+    updatedPlayers[idx] = { ...updatedPlayers[idx], role: copiedRole, doppelgangerCopied: true };
 
-    const updatedLog = addLog(
-      log,
-      nightNumber,
-      dayNumber,
-      'ACTION',
-      `🎭 Doppelganger ${doppel.name} menggantikan role ${target.name} dan sekarang menjadi ${ROLES[copiedRole]?.name || copiedRole}.`
-    );
-
-    return {
-      players: updatedPlayers,
-      log: updatedLog,
-      notice: {
-        playerName: doppel.name,
-        targetName: target.name,
-        oldRole,
-        newRole: copiedRole
-      }
-    };
+    const updatedLog = addLog(log, nightNumber, dayNumber, 'ACTION', `🎭 Doppelganger ${doppel.name} menggantikan role ${target.name} dan menjadi ${ROLES[copiedRole]?.name || copiedRole}.`);
+    return { players: updatedPlayers, log: updatedLog, notice: { playerName: doppel.name, targetName: target.name, oldRole, newRole: copiedRole } };
   };
 
   const resolveVotingResults = () => {
@@ -835,14 +704,9 @@ export default function App() {
     });
 
     let maxVotes = 0;
-    Object.values(voteCounts).forEach(cnt => {
-      if (cnt > maxVotes) maxVotes = cnt;
-    });
+    Object.values(voteCounts).forEach(cnt => { if (cnt > maxVotes) maxVotes = cnt; });
 
-    const topCandidates = maxVotes > 0
-      ? Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes)
-      : [];
-
+    const topCandidates = maxVotes > 0 ? Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes) : [];
     const validVoteCount = Object.values(votes).filter(Boolean).length;
     const allVotesSkipped = validVoteCount === 0;
 
@@ -854,7 +718,6 @@ export default function App() {
     if (topCandidates.length === 1 && maxVotes > 0) {
       const eliminatedId = topCandidates[0];
       const eliminatedPlayer = updatedPlayers.find(p => p.id === eliminatedId);
-
       log = addLog(log, nightNumber, dayNumber, 'ACTION', `${eliminatedPlayer.name} mendapatkan suara terbanyak (${maxVotes} suara) dan tereliminasi.`);
 
       let newDeathsMap = new Map();
@@ -864,7 +727,6 @@ export default function App() {
       while (!loversChainResolved) {
         loversChainResolved = true;
         const currentDeadIds = Array.from(newDeathsMap.keys());
-
         for (const deadId of currentDeadIds) {
           const deadPlayer = updatedPlayers.find(p => p.id === deadId);
           if (deadPlayer && deadPlayer.loverId) {
@@ -872,11 +734,7 @@ export default function App() {
             const partner = updatedPlayers.find(p => p.id === partnerId);
             if (partner && partner.alive && !newDeathsMap.has(partnerId)) {
               newDeathsMap.set(partnerId, 'LOVER');
-              loverDeathNotice.push({
-                id: `lover_${partner.id}_${nightNumber}_${dayNumber}`,
-                name: partner.name,
-                partnerName: deadPlayer.name
-              });
+              loverDeathNotice.push({ id: `lover_${partner.id}_${nightNumber}_${dayNumber}`, name: partner.name, partnerName: deadPlayer.name });
               log = addLog(log, nightNumber, dayNumber, 'DEATH', `💔 ${partner.name} ikut meninggal karena pasangan ${deadPlayer.name} mati.`);
               loversChainResolved = false;
             }
@@ -899,34 +757,15 @@ export default function App() {
       const eliminatedWasJester = eliminatedPlayer?.role === 'JESTER';
       if (eliminatedWasJester) {
         log = addLog(log, nightNumber, dayNumber, 'WIN', `Jester ${eliminatedPlayer.name} berhasil tereliminasi lewat voting dan menang!`);
-
         if (doppelgangerRoleChangeNotice) {
           setGameState({
-            ...gameState,
-            players: updatedPlayers,
-            gameLog: log,
-            lastDayDeaths: dayDeaths,
-            loverDeathNotice,
-            doppelgangerRoleChangeNotice,
-            currentPhase: 'DOPPELGANGER_REVEAL',
-            doppelgangerRevealNextPhase: 'GAME_OVER',
-            doppelgangerRevealWinner: 'JESTER',
-            winner: 'JESTER',
+            ...gameState, players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerRoleChangeNotice,
+            currentPhase: 'DOPPELGANGER_REVEAL', doppelgangerRevealNextPhase: 'GAME_OVER', doppelgangerRevealWinner: 'JESTER', winner: 'JESTER',
             ...resetDoppelgangerAbilityState(gameState, doppelgangerRoleChangeNotice.newRole)
           });
           return;
         }
-
-        setGameState({
-          ...gameState,
-          players: updatedPlayers,
-          gameLog: log,
-          lastDayDeaths: dayDeaths,
-          loverDeathNotice,
-          doppelgangerRoleChangeNotice,
-          currentPhase: 'GAME_OVER',
-          winner: 'JESTER'
-        });
+        setGameState({ ...gameState, players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerRoleChangeNotice, currentPhase: 'GAME_OVER', winner: 'JESTER' });
         return;
       }
     } else if (allVotesSkipped) {
@@ -936,12 +775,7 @@ export default function App() {
     }
 
     let tempState = {
-      ...gameState,
-      players: updatedPlayers,
-      gameLog: log,
-      lastDayDeaths: dayDeaths,
-      loverDeathNotice,
-      doppelgangerRoleChangeNotice,
+      ...gameState, players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerRoleChangeNotice,
       wolfCubRagePending: gameState.wolfCubRagePending || dayDeaths.some(d => d.player.role === 'WOLF_CUB'),
       hunterPending: dayDeaths.some(d => d.player.role === 'HUNTER' && !d.player.hunterRevengeUsed)
     };
@@ -960,30 +794,12 @@ export default function App() {
     if (tempState.hunterPending && !winResult) {
       setGameState({ ...tempState, currentPhase: 'HUNTER_REVENGE', gameLog: log });
     } else if (doppelgangerRoleChangeNotice) {
-      setGameState({
-        ...tempState,
-        currentPhase: 'DOPPELGANGER_REVEAL',
-        doppelgangerRevealNextPhase: winResult ? 'GAME_OVER' : 'NIGHT_INTRO',
-        doppelgangerRevealWinner: winResult || null,
-        winner: winResult || null,
-        gameLog: log
-      });
+      setGameState({ ...tempState, currentPhase: 'DOPPELGANGER_REVEAL', doppelgangerRevealNextPhase: winResult ? 'GAME_OVER' : 'NIGHT_INTRO', doppelgangerRevealWinner: winResult || null, winner: winResult || null, gameLog: log });
     } else if (winResult) {
-      setGameState({
-        ...tempState,
-        currentPhase: 'GAME_OVER',
-        winner: winResult,
-        gameLog: log
-      });
+      setGameState({ ...tempState, currentPhase: 'GAME_OVER', winner: winResult, gameLog: log });
     } else {
       setGameState({
-        ...tempState,
-        currentPhase: 'NIGHT_INTRO',
-        nightNumber: nightNumber + 1,
-        dayNumber: dayNumber + 1,
-        votes: {},
-        currentVoterIndex: 0,
-        discussionEndTimestamp: null,
+        ...tempState, currentPhase: 'NIGHT_INTRO', nightNumber: nightNumber + 1, dayNumber: dayNumber + 1, votes: {}, currentVoterIndex: 0, discussionEndTimestamp: null,
         gameLog: addLog(log, nightNumber + 1, dayNumber + 1, 'INFO', `Memulai Malam ${nightNumber + 1}.`)
       });
     }
@@ -991,64 +807,32 @@ export default function App() {
 
   const startDiscussionTimer = () => {
     const endTimestamp = Date.now() + gameState.discussionDurationSeconds * 1000;
-    setGameState(prev => ({
-      ...prev,
-      undoStack: pushUndoState(prev),
-      discussionEndTimestamp: endTimestamp,
-      isTimerPaused: false,
-      pausedRemainingSeconds: null,
-      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Diskusi dimulai (5 Menit).')
-    }));
+    setGameState(prev => ({ ...prev, undoStack: pushUndoState(prev), discussionEndTimestamp: endTimestamp, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Diskusi dimulai.') }));
   };
 
-  const pauseDiscussionTimer = () => {
-    setGameState(prev => ({
-      ...prev,
-      isTimerPaused: true,
-      pausedRemainingSeconds: remainingSeconds
-    }));
-  };
-
-  const resumeDiscussionTimer = () => {
-    const newEndTimestamp = Date.now() + remainingSeconds * 1000;
-    setGameState(prev => ({
-      ...prev,
-      isTimerPaused: false,
-      discussionEndTimestamp: newEndTimestamp,
-      pausedRemainingSeconds: null
-    }));
-  };
+  const pauseDiscussionTimer = () => setGameState(prev => ({ ...prev, isTimerPaused: true, pausedRemainingSeconds: remainingSeconds }));
+  const resumeDiscussionTimer = () => setGameState(prev => ({ ...prev, isTimerPaused: false, discussionEndTimestamp: Date.now() + remainingSeconds * 1000, pausedRemainingSeconds: null }));
 
   const handleFinishDiscussionEarly = () => {
     setConfirmModalData({
       title: 'Akhiri Diskusi Sekarang?',
-      message: 'Apakah Anda yakin ingin menyelesaikan waktu diskusi dan langsung melanjutkan ke sesi voting?',
-      onConfirm: () => {
-        setConfirmModalData(null);
-        triggerAutoTransitionToVoting();
-      }
+      message: 'Lanjut langsung ke sesi voting?',
+      onConfirm: () => { setConfirmModalData(null); triggerAutoTransitionToVoting(); }
     });
   };
 
   const handleUndo = () => {
-    if (!gameState.undoStack || gameState.undoStack.length === 0) {
-      triggerToast('Tidak ada aksi yang dapat dibatalkan.');
-      return;
-    }
-
+    if (!gameState.undoStack || gameState.undoStack.length === 0) { triggerToast('Tidak ada aksi yang dapat dibatalkan.'); return; }
     setConfirmModalData({
       title: 'Batalkan Aksi Terakhir (Undo)?',
-      message: 'Apakah Anda yakin ingin membatalkan konfirmasi aksi sebelumnya?',
+      message: 'Kembali ke state konfirmasi sebelumnya?',
       onConfirm: () => {
         setConfirmModalData(null);
         setGameState(prev => {
           const stack = [...prev.undoStack];
           const previousState = stack.shift();
           triggerToast('Aksi sebelumnya berhasil dibatalkan.');
-          return {
-            ...previousState,
-            undoStack: stack
-          };
+          return { ...previousState, undoStack: stack };
         });
       }
     });
@@ -1057,7 +841,7 @@ export default function App() {
   const handleRestartSamePlayers = () => {
     setConfirmModalData({
       title: 'Main Lagi Dengan Pemain Sama?',
-      message: 'Semua progres game ini akan direset, dan peran akan diacak ulang untuk pemain yang sama.',
+      message: 'Peran akan diacak ulang untuk pemain yang sama.',
       onConfirm: () => {
         setConfirmModalData(null);
         const playerNames = gameState.players.map(p => p.name);
@@ -1065,25 +849,10 @@ export default function App() {
         const shuffledRoles = shuffle(roleList);
 
         const newPlayers = playerNames.map((name, idx) => ({
-          id: 'player_' + (idx + 1) + '_' + Date.now(),
-          name,
-          role: shuffledRoles[idx],
-          alive: true,
-          loverId: null,
-          protectedLastNight: false,
-          protectedThisNight: false,
-          deathReason: null,
-          deathNight: null,
-          deathDay: null,
-          hunterRevengeUsed: false
+          id: 'player_' + (idx + 1) + '_' + Date.now(), name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false
         }));
 
-        setGameState({
-          ...createInitialGameState(),
-          players: newPlayers,
-          currentPhase: 'ROLE_SUMMARY',
-          gameLog: addLog([], 1, 1, 'INFO', `Game diulang dengan ${newPlayers.length} pemain yang sama.`)
-        });
+        setGameState({ ...createInitialGameState(), players: newPlayers, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
       }
     });
   };
@@ -1091,18 +860,10 @@ export default function App() {
   const handleBackToHome = () => {
     setConfirmModalData({
       title: 'KEMBALI KE HALAMAN AWAL?',
-      message: 'Permainan yang sedang berjalan akan ditinggalkan. Data permainan saat ini akan dihapus.',
+      message: 'Data permainan saat ini akan dihapus.',
       onConfirm: () => {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
-        setConfirmModalData(null);
-        setShowRoleListDrawer(false);
-        setShowGameLogDrawer(false);
-        setShowDashboardDrawer(false);
-        setShowRulesModal(false);
-        setToastMessage(null);
-        setInputPlayerNames([]);
-        setPlayerCount(0);
-        setGameState(createInitialGameState());
+        setConfirmModalData(null); setShowRoleListDrawer(false); setShowGameLogDrawer(false); setShowDashboardDrawer(false); setShowRulesModal(false); setToastMessage(null); setInputPlayerNames([]); setPlayerCount(0); setGameState(createInitialGameState());
       }
     });
   };
@@ -1110,12 +871,8 @@ export default function App() {
   const handleNewGame = () => {
     setConfirmModalData({
       title: 'Mulai Game Baru?',
-      message: 'Semua data permainan saat ini akan dihapus permanen. Lanjutkan?',
-      onConfirm: () => {
-        setConfirmModalData(null);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-        setGameState(createInitialGameState());
-      }
+      message: 'Hapus data game saat ini?',
+      onConfirm: () => { setConfirmModalData(null); localStorage.removeItem(LOCAL_STORAGE_KEY); setGameState(createInitialGameState()); }
     });
   };
 
@@ -1141,7 +898,7 @@ export default function App() {
     const activeIndex = nightSteps.findIndex(s => s.key === gameState.currentPhase);
 
     return (
-      <div className="w-full bg-slate-900/90 border-b border-slate-800 px-4 py-2.5 overflow-x-auto">
+      <div className="w-full bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 overflow-x-auto shadow-inner">
         <div className="max-w-xl mx-auto flex items-center justify-center gap-2 text-xs">
           {nightSteps.map((step, idx) => {
             const isDone = idx < activeIndex;
@@ -1149,13 +906,13 @@ export default function App() {
 
             return (
               <React.Fragment key={step.key}>
-                {idx > 0 && <span className="text-slate-600">→</span>}
-                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full border transition font-bold whitespace-nowrap ${
+                {idx > 0 && <span className="text-slate-700">→</span>}
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all duration-300 font-bold whitespace-nowrap ${
                   isCurrent 
-                    ? 'bg-indigo-950 border-indigo-500 text-indigo-300 shadow-md shadow-indigo-950/50' 
+                    ? 'bg-indigo-950/90 border-indigo-500 text-indigo-300 shadow-lg shadow-indigo-950/60 scale-105' 
                     : isDone 
-                    ? 'bg-slate-950 border-slate-800 text-emerald-400' 
-                    : 'bg-slate-950/40 border-slate-900 text-slate-600'
+                    ? 'bg-slate-950/80 border-slate-800 text-emerald-400 opacity-80' 
+                    : 'bg-slate-950/30 border-slate-900/60 text-slate-600'
                 }`}>
                   <span>{isDone ? '✓' : isCurrent ? '●' : '○'}</span>
                   <span>{step.label}</span>
@@ -1184,23 +941,23 @@ export default function App() {
     const neutralPct = (livingNeutral / totalLiving) * 100;
 
     return (
-      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-start">
-        <div className="bg-slate-900 border-r border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-5 space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-start animate-fadeIn">
+        <div className="bg-slate-900/95 border-r border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-6 space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h3 className="text-lg font-black text-white flex items-center gap-2">
               <span>📊 Moderator Dashboard</span>
             </h3>
-            <button onClick={() => setShowDashboardDrawer(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+            <button onClick={() => setShowDashboardDrawer(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Kekuatan Kubu (Health Bar)</span>
-            <div className="w-full h-4 bg-slate-900 rounded-full overflow-hidden flex border border-slate-800 p-0.5">
-              <div style={{ width: `${goodPct}%` }} className="bg-emerald-500 h-full transition-all duration-500 rounded-l-full" title="Tim Warga" />
-              <div style={{ width: `${evilPct}%` }} className="bg-red-500 h-full transition-all duration-500" title="Tim Evil" />
-              <div style={{ width: `${neutralPct}%` }} className="bg-pink-500 h-full transition-all duration-500 rounded-r-full" title="Netral" />
+          <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-3xl space-y-3 shadow-inner">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Kekuatan Kubu (Health Bar)</span>
+            <div className="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden flex border border-slate-800/80 p-0.5 shadow-inner">
+              <div style={{ width: `${goodPct}%` }} className="bg-emerald-500 h-full transition-all duration-500 rounded-l-full shadow-sm" title="Warga" />
+              <div style={{ width: `${evilPct}%` }} className="bg-red-500 h-full transition-all duration-500 shadow-sm" title="Evil" />
+              <div style={{ width: `${neutralPct}%` }} className="bg-pink-500 h-full transition-all duration-500 rounded-r-full shadow-sm" title="Netral" />
             </div>
             <div className="flex justify-between text-xs font-bold pt-1">
               <span className="text-emerald-400">🏘️ Warga: {livingGood}</span>
@@ -1209,44 +966,44 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Role Ability Tracker</span>
+          <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-3xl space-y-3 shadow-inner">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Role Ability Tracker</span>
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
-                <span>🧪 Witch Heal Potion</span>
-                <span className={`font-bold px-2 py-0.5 rounded ${gameState.witchHealUsed ? 'bg-red-950 text-red-400' : 'bg-emerald-950 text-emerald-400'}`}>
-                  {gameState.witchHealUsed ? 'TERPAKAI (0/1)' : 'TERSEDIA (1/1)'}
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <span className="font-semibold text-slate-300">🧪 Witch Heal Potion</span>
+                <span className={`font-black px-2.5 py-1 rounded-full ${gameState.witchHealUsed ? 'bg-red-950/80 text-red-400 border border-red-900/50' : 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50'}`}>
+                  {gameState.witchHealUsed ? 'TERPAKAI' : 'TERSEDIA'}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
-                <span>☠️ Witch Kill Potion</span>
-                <span className={`font-bold px-2 py-0.5 rounded ${gameState.witchKillUsed ? 'bg-red-950 text-red-400' : 'bg-emerald-950 text-emerald-400'}`}>
-                  {gameState.witchKillUsed ? 'TERPAKAI (0/1)' : 'TERSEDIA (1/1)'}
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <span className="font-semibold text-slate-300">☠️ Witch Kill Potion</span>
+                <span className={`font-black px-2.5 py-1 rounded-full ${gameState.witchKillUsed ? 'bg-red-950/80 text-red-400 border border-red-900/50' : 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50'}`}>
+                  {gameState.witchKillUsed ? 'TERPAKAI' : 'TERSEDIA'}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
-                <span>⭐ Sheriff Ability</span>
-                <span className={`font-bold px-2 py-0.5 rounded ${gameState.sheriffUsed ? 'bg-red-950 text-red-400' : 'bg-emerald-950 text-emerald-400'}`}>
-                  {gameState.sheriffUsed ? 'TERPAKAI (0/1)' : 'TERSEDIA (1/1)'}
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <span className="font-semibold text-slate-300">⭐ Sheriff Ability</span>
+                <span className={`font-black px-2.5 py-1 rounded-full ${gameState.sheriffUsed ? 'bg-red-950/80 text-red-400 border border-red-900/50' : 'bg-emerald-950/80 text-emerald-400 border border-emerald-900/50'}`}>
+                  {gameState.sheriffUsed ? 'TERPAKAI' : 'TERSEDIA'}
                 </span>
               </div>
-              <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
-                <span>👑 Mayor Reveal</span>
-                <span className={`font-bold px-2 py-0.5 rounded ${gameState.mayorRevealed ? 'bg-amber-950 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
+              <div className="flex justify-between items-center p-3 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <span className="font-semibold text-slate-300">👑 Mayor Reveal</span>
+                <span className={`font-black px-2.5 py-1 rounded-full ${gameState.mayorRevealed ? 'bg-amber-950/80 text-amber-400 border border-amber-900/50' : 'bg-slate-800/80 text-slate-400 border border-slate-700/50'}`}>
                   {gameState.mayorRevealed ? 'AKTIF (2 Suara)' : 'BELUM AKTIF'}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-2 text-xs text-slate-300">
+          <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-3xl space-y-2 text-xs text-slate-300 shadow-inner">
             <div className="flex justify-between">
-              <span className="text-slate-500">Status Sesi:</span>
-              <span className="font-bold text-white">Malam {gameState.nightNumber} / Hari {gameState.dayNumber}</span>
+              <span className="text-slate-500 font-medium">Status Sesi:</span>
+              <span className="font-black text-white">Malam {gameState.nightNumber} / Hari {gameState.dayNumber}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Pemain Hidup / Mati:</span>
-              <span className="font-bold text-white">{livingPlayers.length} Hidup · {deadPlayers.length} Mati</span>
+              <span className="text-slate-500 font-medium">Pemain Hidup / Mati:</span>
+              <span className="font-black text-white">{livingPlayers.length} Hidup · {deadPlayers.length} Mati</span>
             </div>
           </div>
         </div>
@@ -1257,7 +1014,7 @@ export default function App() {
   const renderToast = () => {
     if (!toastMessage) return null;
     return (
-      <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-800 border border-amber-500/50 text-amber-200 px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-sm animate-bounce">
+      <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-800/95 backdrop-blur-md border border-amber-500/50 text-amber-200 px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-bold animate-bounce">
         <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
         <span>{toastMessage}</span>
       </div>
@@ -1269,18 +1026,18 @@ export default function App() {
     if (notices.length === 0) return null;
 
     return (
-      <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-900 border-2 border-pink-600 rounded-3xl p-6 shadow-2xl space-y-5">
+      <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div className="w-full max-w-md bg-slate-900 border-2 border-pink-600/80 rounded-3xl p-6 shadow-2xl space-y-5">
           <div className="text-center space-y-2">
             <div className="text-5xl">💔</div>
             <h3 className="text-2xl font-black text-pink-400">COUPLE TERPUTUS</h3>
-            <p className="text-sm text-slate-300">Pasangan Cupid ikut meninggal karena pasangannya mati.</p>
+            <p className="text-xs text-slate-300">Pasangan Cupid ikut meninggal karena pasangannya mati.</p>
           </div>
 
           <div className="space-y-2">
             {notices.map((notice) => (
-              <div key={notice.id} className="p-4 rounded-2xl bg-pink-950/60 border border-pink-800 text-center">
-                <p className="text-lg font-black text-white">{notice.name}</p>
+              <div key={notice.id} className="p-4 rounded-2xl bg-pink-950/60 border border-pink-800/80 text-center">
+                <p className="text-base font-black text-white">{notice.name}</p>
                 <p className="text-xs text-pink-300 mt-1">
                   ikut meninggal karena <strong>{notice.partnerName}</strong> mati.
                 </p>
@@ -1290,7 +1047,7 @@ export default function App() {
 
           <button
             onClick={() => setGameState(prev => ({ ...prev, loverDeathNotice: [] }))}
-            className="w-full py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-black transition"
+            className="w-full py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-black transition shadow-lg shadow-pink-950/50"
           >
             MENGERTI
           </button>
@@ -1302,23 +1059,23 @@ export default function App() {
   const renderConfirmModal = () => {
     if (!confirmModalData) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div className="bg-slate-900 border border-slate-700/80 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4">
           <div className="flex items-center gap-3 text-amber-400">
             <AlertTriangle className="w-6 h-6 shrink-0" />
-            <h3 className="text-lg font-bold text-white">{confirmModalData.title}</h3>
+            <h3 className="text-base font-bold text-white">{confirmModalData.title}</h3>
           </div>
-          <p className="text-slate-300 text-sm leading-relaxed">{confirmModalData.message}</p>
+          <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">{confirmModalData.message}</p>
           <div className="flex justify-end gap-3 pt-2">
             <button
               onClick={() => setConfirmModalData(null)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition"
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
             >
               Batal
             </button>
             <button
               onClick={confirmModalData.onConfirm}
-              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold shadow-lg transition"
+              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-lg shadow-red-950/50 transition"
             >
               Konfirmasi
             </button>
@@ -1331,34 +1088,34 @@ export default function App() {
   const renderRulesModal = () => {
     if (!showRulesModal) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl max-h-[85vh] rounded-2xl flex flex-col shadow-2xl">
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl max-h-[85vh] rounded-3xl flex flex-col shadow-2xl">
           <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-lg">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-base">
               <BookOpen className="w-5 h-5" />
               <span>Panduan Aturan Werewolf</span>
             </div>
-            <button onClick={() => setShowRulesModal(false)} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
-              <X className="w-6 h-6" />
+            <button onClick={() => setShowRulesModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+              <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="p-5 overflow-y-auto space-y-4 text-sm text-slate-300">
-            <section className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
-              <h4 className="font-bold text-amber-300 text-base flex items-center gap-2">
+          <div className="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-300">
+            <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2">
+              <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
                 <Crown className="w-4 h-4" /> Tujuan Permainan
               </h4>
               <p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil (Werewolf dan Wolf Cub) dari desa.</p>
               <p>• <strong>Tim Werewolf:</strong> Jumlah role Evil yang hidup mencapai atau melebihi jumlah pemain non-Evil yang hidup.</p>
             </section>
 
-            <section className="space-y-3">
-              <h4 className="font-bold text-white text-base">Aturan Peran</h4>
+            <section className="space-y-2.5">
+              <h4 className="font-bold text-white text-sm">Aturan Peran</h4>
               {Object.entries(ROLES).map(([key, role]) => (
-                <div key={key} className={`p-3 rounded-xl border ${role.border} ${role.bg} flex items-start gap-3`}>
+                <div key={key} className={`p-3 rounded-2xl border ${role.border} ${role.bg} flex items-start gap-3 shadow-md`}>
                   <span className="text-2xl">{role.icon}</span>
                   <div>
-                    <span className={`font-bold ${role.color}`}>{role.name} ({role.team})</span>
-                    <p className="text-xs text-slate-300 mt-1">{role.desc}</p>
+                    <span className={`font-black ${role.color}`}>{role.name} ({role.team})</span>
+                    <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{role.desc}</p>
                   </div>
                 </div>
               ))}
@@ -1372,14 +1129,14 @@ export default function App() {
   const renderRoleListDrawer = () => {
     if (!showRoleListDrawer) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-end">
-        <div className="bg-slate-900 border-l border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-5">
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-end animate-fadeIn">
+        <div className="bg-slate-900/95 border-l border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg font-black text-white flex items-center gap-2">
               <Eye className="w-5 h-5 text-purple-400" />
               <span>Daftar Peran Moderator</span>
             </h3>
-            <button onClick={() => setShowRoleListDrawer(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+            <button onClick={() => setShowRoleListDrawer(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -1391,35 +1148,35 @@ export default function App() {
               return (
                 <div
                   key={player.id}
-                  className={`p-3 rounded-xl border flex items-center justify-between transition ${
-                    player.alive ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-950/60 border-slate-900 opacity-60'
+                  className={`p-3.5 rounded-2xl border flex items-center justify-between transition ${
+                    player.alive ? 'bg-slate-950/80 border-slate-800 shadow-sm' : 'bg-slate-950/40 border-slate-900/60 opacity-60'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{roleMeta?.icon}</span>
+                    <span className="text-2xl">{roleMeta?.icon}</span>
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`font-bold ${player.alive ? 'text-white' : 'text-slate-500 line-through'}`}>
                           {player.name}
                         </span>
                         {lover && (
-                          <span className="text-xs bg-pink-950 border border-pink-700 text-pink-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="text-[10px] bg-pink-950/80 border border-pink-700/60 text-pink-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                             ❤️ {lover.name}
                           </span>
                         )}
                       </div>
-                      <span className={`text-xs font-medium ${roleMeta?.color}`}>{roleMeta?.name}</span>
+                      <span className={`text-xs font-semibold ${roleMeta?.color}`}>{roleMeta?.name}</span>
                     </div>
                   </div>
 
                   <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${
+                    className={`text-[10px] px-2.5 py-1 rounded-full font-bold border ${
                       player.alive
-                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800'
-                        : 'bg-red-950/80 text-red-400 border-red-900'
+                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/80'
+                        : 'bg-red-950/80 text-red-400 border-red-900/80'
                     }`}
                   >
-                    {player.alive ? '🟢 Hidup' : '☠️ Tereliminasi'}
+                    {player.alive ? '🟢 Hidup' : '☠️ Mati'}
                   </span>
                 </div>
               );
@@ -1433,31 +1190,31 @@ export default function App() {
   const renderGameLogDrawer = () => {
     if (!showGameLogDrawer) return null;
     return (
-      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-end">
-        <div className="bg-slate-900 border-l border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-5">
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-end animate-fadeIn">
+        <div className="bg-slate-900/95 border-l border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg font-black text-white flex items-center gap-2">
               <History className="w-5 h-5 text-blue-400" />
-              <span>Catatan Permainan (Game Log)</span>
+              <span>Catatan Permainan</span>
             </h3>
-            <button onClick={() => setShowGameLogDrawer(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+            <button onClick={() => setShowGameLogDrawer(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto py-4 space-y-3">
             {gameState.gameLog.length === 0 ? (
-              <p className="text-center text-slate-500 text-sm py-8">Belum ada riwayat permainan.</p>
+              <p className="text-center text-slate-500 text-xs py-8">Belum ada riwayat permainan.</p>
             ) : (
               gameState.gameLog.map(entry => (
-                <div key={entry.id} className="p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span className="font-semibold text-amber-400">
+                <div key={entry.id} className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl space-y-1 shadow-sm">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span className="font-bold text-amber-400">
                       Malam {entry.nightNumber} / Hari {entry.dayNumber}
                     </span>
                     <span>{entry.timestamp}</span>
                   </div>
-                  <p className="text-sm text-slate-200 leading-snug">{entry.message}</p>
+                  <p className="text-xs text-slate-200 leading-relaxed">{entry.message}</p>
                 </div>
               ))
             )}
@@ -1473,37 +1230,14 @@ export default function App() {
       const winner = prev.doppelgangerRevealWinner;
 
       if (nextPhase === 'GAME_OVER') {
-        return {
-          ...prev,
-          currentPhase: 'GAME_OVER',
-          winner,
-          doppelgangerRoleChangeNotice: null,
-          doppelgangerRevealNextPhase: null,
-          doppelgangerRevealWinner: null
-        };
+        return { ...prev, currentPhase: 'GAME_OVER', winner, doppelgangerRoleChangeNotice: null, doppelgangerRevealNextPhase: null, doppelgangerRevealWinner: null };
       }
-
       if (nextPhase === 'MORNING') {
-        return {
-          ...prev,
-          currentPhase: 'MORNING',
-          doppelgangerRoleChangeNotice: null,
-          doppelgangerRevealNextPhase: null,
-          doppelgangerRevealWinner: null
-        };
+        return { ...prev, currentPhase: 'MORNING', doppelgangerRoleChangeNotice: null, doppelgangerRevealNextPhase: null, doppelgangerRevealWinner: null };
       }
-
       return {
-        ...prev,
-        currentPhase: 'NIGHT_INTRO',
-        nightNumber: prev.nightNumber + 1,
-        dayNumber: prev.dayNumber + 1,
-        votes: {},
-        currentVoterIndex: 0,
-        discussionEndTimestamp: null,
-        doppelgangerRoleChangeNotice: null,
-        doppelgangerRevealNextPhase: null,
-        doppelgangerRevealWinner: null,
+        ...prev, currentPhase: 'NIGHT_INTRO', nightNumber: prev.nightNumber + 1, dayNumber: prev.dayNumber + 1, votes: {}, currentVoterIndex: 0, discussionEndTimestamp: null,
+        doppelgangerRoleChangeNotice: null, doppelgangerRevealNextPhase: null, doppelgangerRevealWinner: null,
         gameLog: addLog(prev.gameLog, prev.nightNumber + 1, prev.dayNumber + 1, 'INFO', `Memulai Malam ${prev.nightNumber + 1}.`)
       };
     });
@@ -1513,47 +1247,31 @@ export default function App() {
     const notice = gameState.doppelgangerRoleChangeNotice;
     if (!notice) return renderNightIntro();
 
-    const newRole = ROLES[notice.newRole] || {
-      name: notice.newRole,
-      team: 'Unknown',
-      icon: '🎭',
-      color: 'text-indigo-300',
-      bg: 'bg-indigo-950/80',
-      border: 'border-indigo-600',
-      desc: 'Role baru Doppelganger.'
-    };
+    const newRole = ROLES[notice.newRole] || { name: notice.newRole, team: 'Unknown', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/80', border: 'border-indigo-600', desc: 'Role baru Doppelganger.' };
 
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <div className="rounded-3xl border border-indigo-500/50 bg-slate-900 shadow-2xl overflow-hidden">
-          <div className="p-6 sm:p-8 text-center">
-            <div className="text-xs font-black tracking-[0.25em] text-indigo-400 uppercase">🎭 SESI DOPPELGANGER</div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white mt-3">Targetmu telah mati</h1>
-            <p className="text-slate-400 mt-3 leading-relaxed">
-              <strong className="text-white">{notice.targetName}</strong>, target yang kamu pilih, sudah tereliminasi.
-            </p>
+      <div className="max-w-xl mx-auto px-4 py-8 animate-fadeIn">
+        <div className="rounded-3xl border border-indigo-500/40 bg-slate-900/90 backdrop-blur-md shadow-2xl overflow-hidden p-6 sm:p-8 text-center space-y-6">
+          <div className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">🎭 SESI DOPPELGANGER</div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white">Targetmu telah mati</h1>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            <strong className="text-white">{notice.targetName}</strong>, target yang kamu pilih, telah tereliminasi.
+          </p>
 
-            <div className="mt-7 rounded-2xl border border-slate-700 bg-slate-950 p-5">
-              <div className="text-xs font-black tracking-widest text-slate-500 uppercase">Role target</div>
-              <div className="text-2xl font-black text-white mt-2">{newRole.icon} {newRole.name}</div>
-              <div className="text-sm text-slate-400 mt-1">Role ini sekarang menjadi role-mu.</div>
-            </div>
-
-            <div className={`mt-4 rounded-2xl border ${newRole.border} ${newRole.bg} p-5`}>
-              <div className="text-xs font-black tracking-widest text-indigo-300 uppercase">Role barumu</div>
-              <div className={`text-3xl font-black mt-2 ${newRole.color}`}>{newRole.icon} {newRole.name}</div>
-              <div className="text-sm text-slate-300 mt-2">Tim: <strong>{newRole.team}</strong></div>
-              <p className="text-sm text-slate-300 mt-3 leading-relaxed">{newRole.desc}</p>
-            </div>
-
-            <button
-              onClick={continueAfterDoppelgangerReveal}
-              className="w-full mt-7 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black transition flex items-center justify-center gap-2"
-            >
-              <Check className="w-5 h-5" />
-              <span>PAHAM, LANJUTKAN PERMAINAN</span>
-            </button>
+          <div className={`rounded-2xl border ${newRole.border} ${newRole.bg} p-5 space-y-2 text-center`}>
+            <div className="text-[10px] font-black tracking-widest text-indigo-300 uppercase">Role barumu</div>
+            <div className={`text-3xl font-black ${newRole.color}`}>{newRole.icon} {newRole.name}</div>
+            <div className="text-xs text-slate-300">Tim: <strong>{newRole.team}</strong></div>
+            <p className="text-xs text-slate-300 leading-relaxed pt-1">{newRole.desc}</p>
           </div>
+
+          <button
+            onClick={continueAfterDoppelgangerReveal}
+            className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/50"
+          >
+            <Check className="w-5 h-5" />
+            <span>PAHAM, LANJUTKAN PERMAINAN</span>
+          </button>
         </div>
       </div>
     );
@@ -1614,16 +1332,16 @@ export default function App() {
     }
 
     return (
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-bold text-white">
+            <div className="flex items-center gap-1.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs font-bold text-white shadow-sm">
               {phaseIcon}
               <span>{phaseBadge}</span>
             </div>
 
             {totalCount > 0 && (
-              <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
+              <div className="text-xs text-slate-400 hidden sm:flex items-center gap-1 bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-800/80 font-medium">
                 <Users className="w-3.5 h-3.5 text-slate-400" />
                 <span>{livingCount}/{totalCount} Hidup</span>
               </div>
@@ -1633,7 +1351,7 @@ export default function App() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowDashboardDrawer(true)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 transition"
+              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-emerald-400 transition"
               title="Dashboard Moderator"
             >
               📊
@@ -1641,7 +1359,7 @@ export default function App() {
 
             <button
               onClick={handleBackToHome}
-              className="p-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 transition"
+              className="p-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 transition"
               title="Kembali ke Halaman Awal"
             >
               <Home className="w-4 h-4" />
@@ -1650,7 +1368,7 @@ export default function App() {
             {gameState.undoStack && gameState.undoStack.length > 0 && (
               <button
                 onClick={handleUndo}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-amber-400 transition"
+                className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-amber-400 transition"
                 title="Batalkan Aksi Terakhir (Undo)"
               >
                 <CornerUpLeft className="w-4 h-4" />
@@ -1659,7 +1377,7 @@ export default function App() {
 
             <button
               onClick={() => setShowRoleListDrawer(true)}
-              className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-800 text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition"
+              className="px-2.5 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-800/80 text-purple-300 text-xs font-bold flex items-center gap-1.5 transition"
             >
               <Eye className="w-3.5 h-3.5" />
               <span className="hidden xs:inline">Role List</span>
@@ -1667,14 +1385,14 @@ export default function App() {
 
             <button
               onClick={() => setShowGameLogDrawer(true)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition"
+              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 transition"
             >
               <History className="w-4 h-4" />
             </button>
 
             <button
               onClick={() => setShowRulesModal(true)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition"
+              className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 transition"
             >
               <HelpCircle className="w-4 h-4" />
             </button>
@@ -1688,19 +1406,19 @@ export default function App() {
     const hasExistingGame = gameState.players.length > 0 && gameState.currentPhase !== 'HOME';
 
     return (
-      <div className="min-h-[85vh] flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-[85vh] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
         <div className="max-w-md w-full space-y-8">
           <div className="space-y-4">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl">
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl shadow-red-950/40">
               <span className="text-5xl">🌙</span>
             </div>
-            <h1 className="text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase">
+            <h1 className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase">
               WEREWOLF
             </h1>
-            <p className="text-xs font-semibold tracking-widest text-slate-400 uppercase">
+            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
               Moderator Game Assistant
             </p>
-            <p className="text-sm text-slate-300 leading-relaxed px-4">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed px-4">
               Panduan lengkap untuk menjalankan permainan Werewolf secara otomatis dan terstruktur.
             </p>
           </div>
@@ -1709,7 +1427,7 @@ export default function App() {
             {hasExistingGame && (
               <button
                 onClick={() => {}}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2 transition"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm sm:text-base shadow-xl shadow-emerald-950/40 flex items-center justify-center gap-2 transition"
               >
                 <Play className="w-5 h-5 fill-current" />
                 <span>LANJUTKAN GAME (Malam {gameState.nightNumber})</span>
@@ -1721,7 +1439,7 @@ export default function App() {
                 localStorage.removeItem(LOCAL_STORAGE_KEY);
                 setGameState({ ...createInitialGameState(), currentPhase: 'SETUP' });
               }}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 via-red-600 to-amber-700 hover:opacity-95 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2 transition"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 via-red-600 to-amber-700 hover:opacity-95 text-white font-black text-sm sm:text-base shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition"
             >
               <Sparkles className="w-5 h-5" />
               <span>MULAI GAME BARU</span>
@@ -1729,7 +1447,7 @@ export default function App() {
 
             <button
               onClick={() => setShowRulesModal(true)}
-              className="w-full py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-sm flex items-center justify-center gap-2 transition"
+              className="w-full py-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition"
             >
               <BookOpen className="w-4 h-4 text-amber-400" />
               <span>ATURAN PERMAINAN</span>
@@ -1742,17 +1460,16 @@ export default function App() {
 
   const renderSetup = () => {
     return (
-      <div className="max-w-xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-xl mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
+          <h2 className="text-2xl font-black text-white flex items-center justify-center gap-2">
             <Users className="w-6 h-6 text-amber-400" />
             <span>SETUP PEMAIN</span>
           </h2>
           <p className="text-xs text-slate-400">Pilih preset cepat atau atur peserta manual.</p>
         </div>
 
-        {/* Game Presets */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-3 shadow-xl">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">⚡ Game Presets (Pilih Cepat)</h3>
             <span className="text-[10px] text-slate-500">Atur otomatis</span>
@@ -1764,7 +1481,7 @@ export default function App() {
                 key={preset.id}
                 type="button"
                 onClick={() => applyGamePreset(preset)}
-                className="p-3 rounded-xl border border-slate-800 bg-slate-950 hover:bg-slate-800 hover:border-amber-500/50 text-left transition space-y-1 group"
+                className="p-3.5 rounded-2xl border border-slate-800 bg-slate-950/80 hover:bg-slate-800/80 hover:border-amber-500/50 text-left transition space-y-1 group shadow-sm"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-amber-400 group-hover:text-amber-300">{preset.name}</span>
@@ -1778,7 +1495,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-4 shadow-xl">
           <div className="flex items-center justify-between gap-3">
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
@@ -1798,10 +1515,10 @@ export default function App() {
               value={participantSearch}
               onChange={e => setParticipantSearch(e.target.value)}
               placeholder="Cari nama peserta..."
-              className="w-full px-3 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+              className="w-full px-3 py-2.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-500"
             />
-            <button onClick={selectAllParticipants} className="px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-black transition">PILIH SEMUA</button>
-            <button onClick={clearParticipants} className="px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">RESET</button>
+            <button onClick={selectAllParticipants} className="px-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-black transition whitespace-nowrap">PILIH SEMUA</button>
+            <button onClick={clearParticipants} className="px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">RESET</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[40vh] overflow-y-auto pr-1">
@@ -1814,23 +1531,23 @@ export default function App() {
                     key={name}
                     type="button"
                     onClick={() => toggleParticipant(name)}
-                    className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 transition ${
+                    className={`w-full p-3 rounded-2xl border text-left flex items-center gap-3 transition ${
                       selected
-                        ? 'bg-amber-950/60 border-amber-500 text-amber-100'
-                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
+                        ? 'bg-amber-950/60 border-amber-500/80 text-amber-100 shadow-sm'
+                        : 'bg-slate-950/60 border-slate-800/80 text-slate-300 hover:bg-slate-800/80'
                     }`}
                   >
-                    <span className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 text-xs font-black ${selected ? 'bg-amber-500 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-600'}`}>
+                    <span className={`w-6 h-6 rounded-xl border flex items-center justify-center shrink-0 text-xs font-black ${selected ? 'bg-amber-500 border-amber-400 text-slate-950' : 'border-slate-700 text-slate-600'}`}>
                       {selected ? '✓' : index + 1}
                     </span>
-                    <span className="text-sm font-semibold truncate">{name}</span>
+                    <span className="text-xs sm:text-sm font-semibold truncate">{name}</span>
                   </button>
                 );
               })}
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-3 shadow-xl">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Jumlah Role</h3>
             <span className="text-xs font-bold text-amber-400">
@@ -1842,15 +1559,15 @@ export default function App() {
               const meta = ROLES[roleKey];
               const value = Number(roleCountsDraft[roleKey] || 0);
               return (
-                <div key={roleKey} className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
+                <div key={roleKey} className="rounded-2xl border border-slate-800 bg-slate-950/80 p-2.5 shadow-sm">
                   <div className="flex items-center gap-2 mb-2">
                     <span>{meta.icon}</span>
                     <span className={`text-xs font-bold ${meta.color}`}>{meta.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.max(0, value - 1) }))} className="w-8 h-8 rounded-lg bg-slate-800 text-white">−</button>
-                    <div className="flex-1 text-center font-black text-white">{value}</div>
-                    <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.min(playerCount, value + 1) }))} className="w-8 h-8 rounded-lg bg-slate-800 text-white">+</button>
+                    <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.max(0, value - 1) }))} className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold">−</button>
+                    <div className="flex-1 text-center font-black text-white text-xs">{value}</div>
+                    <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.min(playerCount, value + 1) }))} className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
               );
@@ -1861,13 +1578,13 @@ export default function App() {
         <div className="flex gap-3 pt-2">
           <button
             onClick={() => { localStorage.removeItem(LOCAL_STORAGE_KEY); setGameState(createInitialGameState()); }}
-            className="w-1/3 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition"
+            className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm transition"
           >
             Batal
           </button>
           <button
             onClick={validateAndGenerateRoles}
-            className="w-2/3 py-3.5 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold text-base shadow-xl flex items-center justify-center gap-2 transition"
+            className="w-2/3 py-3.5 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-950/50 flex items-center justify-center gap-2 transition"
           >
             <Sparkles className="w-5 h-5" />
             <span>ACAK ROLE</span>
@@ -1884,9 +1601,9 @@ export default function App() {
     }, {});
 
     return (
-      <div className="max-w-xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-xl mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
+          <h2 className="text-2xl font-black text-white flex items-center justify-center gap-2">
             <UserCheck className="w-6 h-6 text-cyan-400" />
             <span>KOMPOSISI ROLE</span>
           </h2>
@@ -1899,15 +1616,15 @@ export default function App() {
           {Object.entries(rolesInGame).map(([roleKey, count]) => {
             const meta = ROLES[roleKey];
             return (
-              <div key={roleKey} className={`p-4 rounded-2xl border ${meta?.border} ${meta?.bg} flex items-center justify-between shadow-lg`}>
+              <div key={roleKey} className={`p-4 rounded-3xl border ${meta?.border} ${meta?.bg} flex items-center justify-between shadow-xl`}>
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">{meta?.icon}</span>
                   <div>
-                    <h4 className={`font-bold ${meta?.color}`}>{meta?.name}</h4>
-                    <span className="text-xs text-slate-400">{meta?.team}</span>
+                    <h4 className={`font-black ${meta?.color}`}>{meta?.name}</h4>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{meta?.team}</span>
                   </div>
                 </div>
-                <div className="px-3 py-1 bg-slate-900/80 rounded-xl border border-slate-700 text-white font-extrabold text-sm">
+                <div className="px-3.5 py-1 bg-slate-950/80 rounded-2xl border border-slate-800 text-white font-black text-xs sm:text-sm">
                   x{count}
                 </div>
               </div>
@@ -1917,7 +1634,7 @@ export default function App() {
 
         <button
           onClick={startRoleReveal}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2 transition"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-sm sm:text-base shadow-xl shadow-cyan-950/40 flex items-center justify-center gap-2 transition"
         >
           <span>BAGIKAN ROLE</span>
           <ArrowRight className="w-5 h-5" />
@@ -1932,12 +1649,12 @@ export default function App() {
     const roleMeta = ROLES[currentPlayer.role];
 
     return (
-      <div className="max-w-md mx-auto p-4 sm:p-6 min-h-[80vh] flex flex-col justify-between space-y-6">
+      <div className="max-w-md mx-auto p-4 sm:p-6 min-h-[80vh] flex flex-col justify-between space-y-6 animate-fadeIn">
         <div className="text-center space-y-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
             PEMBAGIAN ROLE ({revealPlayerIndex + 1} / {players.length})
           </span>
-          <h2 className="text-3xl font-extrabold text-white">{currentPlayer.name}</h2>
+          <h2 className="text-3xl font-black text-white">{currentPlayer.name}</h2>
           <p className="text-xs text-amber-300">Serahkan perangkat hanya kepada {currentPlayer.name}.</p>
         </div>
 
@@ -1947,33 +1664,33 @@ export default function App() {
               onClick={toggleRoleCard}
               className="w-full aspect-[3/4] max-w-xs rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 flex flex-col items-center justify-center p-6 text-center cursor-pointer shadow-2xl hover:border-amber-400 transition"
             >
-              <div className="w-20 h-20 rounded-full bg-slate-900 flex items-center justify-center border border-slate-700 mb-4">
+              <div className="w-20 h-20 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 mb-4 shadow-inner">
                 <Lock className="w-10 h-10 text-amber-400" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-1">ROLE RAHASIA</h3>
+              <h3 className="text-base font-bold text-white mb-1">ROLE RAHASIA</h3>
               <p className="text-xs text-slate-400">Ketuk untuk membuka kartu role.</p>
             </div>
           ) : (
             <div
-              className={`w-full max-w-xs rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl space-y-6`}
+              className={`w-full max-w-xs rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl space-y-6 animate-fadeIn`}
             >
               <div className="space-y-3">
                 <span className="text-6xl block">{roleMeta.icon}</span>
                 <h3 className={`text-2xl font-black uppercase tracking-wider ${roleMeta.color}`}>
                   {roleMeta.name}
                 </h3>
-                <span className="inline-block px-3 py-1 rounded-full bg-black/40 text-xs font-semibold text-slate-200">
+                <span className="inline-block px-3 py-1 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-200">
                   Tim {roleMeta.team}
                 </span>
               </div>
 
-              <p className="text-xs text-slate-200 leading-relaxed bg-black/30 p-3 rounded-xl border border-white/10">
+              <p className="text-xs text-slate-200 leading-relaxed bg-black/40 p-3.5 rounded-2xl border border-white/10">
                 {roleMeta.desc}
               </p>
 
               <button
                 onClick={toggleRoleCard}
-                className="px-4 py-2 rounded-xl bg-black/50 hover:bg-black/70 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition"
+                className="px-4 py-2 rounded-xl bg-black/50 hover:bg-black/70 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition"
               >
                 <Unlock className="w-3.5 h-3.5" />
                 <span>Sembunyikan Role</span>
@@ -1986,7 +1703,7 @@ export default function App() {
           {isRoleCardOpen ? (
             <button
               onClick={nextRevealPlayer}
-              className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-base shadow-xl flex items-center justify-center gap-2 transition"
+              className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-950/50 flex items-center justify-center gap-2 transition"
             >
               <span>LANJUT PEMAIN NEXT</span>
               <ArrowRight className="w-5 h-5" />
@@ -1994,7 +1711,7 @@ export default function App() {
           ) : (
             <button
               onClick={toggleRoleCard}
-              className="w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-base border border-slate-700 shadow-xl transition"
+              className="w-full py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-sm sm:text-base border border-slate-700 shadow-xl transition"
             >
               LIHAT ROLE
             </button>
@@ -2006,20 +1723,20 @@ export default function App() {
 
   const renderNightIntro = () => {
     return (
-      <div className="max-w-md mx-auto p-6 min-h-[75vh] flex flex-col justify-between text-center space-y-6">
+      <div className="max-w-md mx-auto p-6 min-h-[75vh] flex flex-col justify-between text-center space-y-6 animate-fadeIn">
         <div className="space-y-4 pt-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-950 border border-indigo-700/50 text-indigo-400 shadow-2xl">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-950/90 border border-indigo-700/60 text-indigo-400 shadow-2xl shadow-indigo-950/80">
             <Moon className="w-10 h-10 animate-pulse" />
           </div>
-          <h2 className="text-3xl font-extrabold text-white">MALAM {gameState.nightNumber}</h2>
-          <p className="text-lg italic text-amber-200 font-serif">
+          <h2 className="text-3xl font-black text-white tracking-wide">MALAM {gameState.nightNumber}</h2>
+          <p className="text-base sm:text-lg italic text-amber-200 font-serif leading-relaxed">
             "Semua pemain, silakan tutup mata. Malam telah tiba."
           </p>
         </div>
 
         <button
           onClick={advanceNightPhase}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2 transition"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-sm sm:text-base shadow-xl shadow-indigo-950/50 flex items-center justify-center gap-2 transition"
         >
           <span>MULAI AKSI MALAM</span>
           <ArrowRight className="w-5 h-5" />
@@ -2034,18 +1751,18 @@ export default function App() {
     const lover2 = gameState.players.find(p => p.id === gameState.cupidLover2Id);
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-pink-950 border border-pink-700 text-pink-400">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-pink-950/90 border border-pink-700/60 text-pink-400 shadow-lg">
             <Heart className="w-8 h-8 fill-current" />
           </div>
-          <h2 className="text-2xl font-bold text-pink-400">💘 CUPID</h2>
-          <p className="text-sm text-slate-300">Pilih dua pemain hidup untuk terikat menjadi Lovers.</p>
+          <h2 className="text-2xl font-black text-pink-400">💘 CUPID</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih dua pemain hidup untuk terikat menjadi Lovers.</p>
         </div>
 
-        <div className="bg-slate-900 border border-pink-900/50 rounded-2xl p-4 text-center space-y-2">
-          <span className="text-xs font-bold text-pink-300 uppercase tracking-wider">Pasangan Terpilih:</span>
-          <div className="flex items-center justify-center gap-3 text-lg font-bold text-white">
+        <div className="bg-slate-900/90 border border-pink-900/50 rounded-3xl p-4 text-center space-y-2 shadow-xl">
+          <span className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Pasangan Terpilih:</span>
+          <div className="flex items-center justify-center gap-3 text-base sm:text-lg font-black text-white">
             <span className={lover1 ? 'text-pink-400' : 'text-slate-600'}>
               {lover1 ? lover1.name : '[ Pemain 1 ]'}
             </span>
@@ -2071,12 +1788,12 @@ export default function App() {
                     return { ...prev, cupidLover2Id: player.id };
                   });
                 }}
-                className={`p-3 rounded-xl border text-sm font-bold text-left transition flex items-center justify-between ${
-                  isSelected ? 'bg-pink-950 border-pink-500 text-pink-200' : 'bg-slate-900 border-slate-800 text-slate-300'
+                className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${
+                  isSelected ? 'bg-pink-950/80 border-pink-500 text-pink-200 shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'
                 }`}
               >
-                <span>{player.name}</span>
-                {isSelected && <Heart className="w-4 h-4 text-pink-400 fill-current" />}
+                <span className="truncate">{player.name}</span>
+                {isSelected && <Heart className="w-4 h-4 text-pink-400 fill-current shrink-0" />}
               </button>
             );
           })}
@@ -2085,13 +1802,13 @@ export default function App() {
         <div className="flex gap-3 pt-2">
           <button
             onClick={() => setGameState(prev => ({ ...prev, cupidLover1Id: null, cupidLover2Id: null }))}
-            className="w-1/3 py-3.5 rounded-2xl bg-slate-800 text-slate-300 font-semibold text-sm"
+            className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm transition"
           >
             Reset
           </button>
           <button
             onClick={handleConfirmCupid}
-            className="w-2/3 py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-base shadow-xl"
+            className="w-2/3 py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-pink-950/50 transition"
           >
             KONFIRMASI PASANGAN
           </button>
@@ -2117,18 +1834,18 @@ export default function App() {
     };
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950 border border-red-700 text-red-400"><span className="text-3xl">🐺</span></div>
-          <h2 className="text-2xl font-bold text-red-400">WEREWOLF PHASE</h2>
-          <p className="text-sm text-slate-300">Pilih {rage ? '2 pemain' : '1 pemain'} untuk dieliminasi.</p>
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg"><span className="text-3xl">🐺</span></div>
+          <h2 className="text-2xl font-black text-red-400">WEREWOLF PHASE</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih {rage ? '2 pemain' : '1 pemain'} untuk dieliminasi.</p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
           {livingCandidates.map(player => {
             const isSelected = selectedIds.includes(player.id);
             return (
-              <button key={player.id} onClick={() => toggleTarget(player.id)} className={`p-3 rounded-xl border text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-red-950 border-red-500 text-red-200' : 'bg-slate-900 border-slate-800 text-slate-300'}`}>
+              <button key={player.id} onClick={() => toggleTarget(player.id)} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-red-950/80 border-red-500 text-red-200 shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>
                 <span className="truncate">{player.name}</span>
                 {isSelected && <Crosshair className="w-4 h-4 text-red-400 shrink-0" />}
               </button>
@@ -2136,7 +1853,7 @@ export default function App() {
           })}
         </div>
 
-        <button onClick={() => { if (selectedIds.length !== (rage ? 2 : 1)) { triggerToast(rage ? 'Pilih 2 target.' : 'Pilih 1 target.'); return; } advanceNightPhase(); }} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2">
+        <button onClick={() => { if (selectedIds.length !== (rage ? 2 : 1)) { triggerToast(rage ? 'Pilih 2 target.' : 'Pilih 1 target.'); return; } advanceNightPhase(); }} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition">
           <span>KONFIRMASI TARGET WEREWOLF</span>
           <ArrowRight className="w-5 h-5" />
         </button>
@@ -2148,13 +1865,13 @@ export default function App() {
     const livingPlayers = gameState.players.filter(p => p.alive);
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-950 border border-blue-700 text-blue-400">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-950/90 border border-blue-700/60 text-blue-400 shadow-lg">
             <Shield className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-blue-400">🛡️ GUARDIAN PHASE</h2>
-          <p className="text-sm text-slate-300">Pilih 1 pemain untuk dilindungi malam ini.</p>
+          <h2 className="text-2xl font-black text-blue-400">🛡️ GUARDIAN PHASE</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk dilindungi malam ini.</p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
@@ -2167,8 +1884,8 @@ export default function App() {
                 key={player.id}
                 disabled={isDisabled}
                 onClick={() => setGameState(prev => ({ ...prev, guardianTargetId: player.id }))}
-                className={`p-3 rounded-xl border text-sm font-bold text-left transition flex items-center justify-between ${
-                  isDisabled ? 'bg-slate-950 border-slate-900 text-slate-600 cursor-not-allowed' : isSelected ? 'bg-blue-950 border-blue-500 text-blue-200' : 'bg-slate-900 border-slate-800 text-slate-300'
+                className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${
+                  isDisabled ? 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed' : isSelected ? 'bg-blue-950/80 border-blue-500 text-blue-200 shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'
                 }`}
               >
                 <span className="truncate">{player.name}</span>
@@ -2183,7 +1900,7 @@ export default function App() {
             if (!gameState.guardianTargetId) { triggerToast('Pilih pemain untuk dilindungi.'); return; }
             advanceNightPhase();
           }}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-950/50 flex items-center justify-center gap-2 transition"
         >
           <span>KONFIRMASI GUARDIAN</span>
           <ArrowRight className="w-5 h-5" />
@@ -2197,16 +1914,16 @@ export default function App() {
     const candidates = gameState.players.filter(p => p.alive && p.id !== sheriff?.id);
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-yellow-950 border border-yellow-700 text-yellow-300">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-yellow-950/90 border border-yellow-700/60 text-yellow-300 shadow-lg">
             <Award className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-yellow-300">⭐ SHERIFF PHASE</h2>
-          <p className="text-sm text-slate-300">Pilih 1 pemain untuk diuji (1x per game).</p>
+          <h2 className="text-2xl font-black text-yellow-300">⭐ SHERIFF PHASE</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diuji (1x per game).</p>
         </div>
 
-        <button onClick={handleSkipSheriff} className="w-full py-3 bg-slate-700 text-white font-black rounded-2xl">
+        <button onClick={handleSkipSheriff} className="w-full py-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-white font-black rounded-2xl text-xs sm:text-sm transition">
           ⏭️ SKIP SHERIFF
         </button>
 
@@ -2215,7 +1932,7 @@ export default function App() {
             <button
               key={p.id}
               onClick={() => setGameState(prev => ({ ...prev, sheriffTargetId: p.id }))}
-              className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950 border-yellow-500 text-yellow-200' : 'bg-slate-900 border-slate-800 text-slate-300'}`}
+              className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950/80 border-yellow-500 text-yellow-200 shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}
             >
               {p.name}
             </button>
@@ -2225,7 +1942,7 @@ export default function App() {
         <button
           onClick={handleConfirmSheriff}
           disabled={!gameState.sheriffTargetId}
-          className={`w-full py-4 rounded-2xl font-black transition ${gameState.sheriffTargetId ? 'bg-yellow-600 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
+          className={`w-full py-4 rounded-2xl font-black text-xs sm:text-sm transition ${gameState.sheriffTargetId ? 'bg-yellow-600 text-slate-950 hover:bg-yellow-500 shadow-xl shadow-yellow-950/50' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
         >
           KONFIRMASI SHERIFF
         </button>
@@ -2236,11 +1953,11 @@ export default function App() {
   const renderNightDoppelganger = () => {
     const livingPlayers = gameState.players.filter(p => p.alive && p.role !== 'DOPPELGANGER');
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950 border border-indigo-700 text-indigo-300"><span className="text-3xl">🎭</span></div>
-          <h2 className="text-2xl font-bold text-indigo-300">DOPPELGANGER PHASE</h2>
-          <p className="text-sm text-slate-300">Malam 1: Pilih 1 target hidup.</p>
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-lg"><span className="text-3xl">🎭</span></div>
+          <h2 className="text-2xl font-black text-indigo-300">DOPPELGANGER PHASE</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Malam 1: Pilih 1 target hidup.</p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
@@ -2248,14 +1965,14 @@ export default function App() {
             <button
               key={p.id}
               onClick={() => setGameState(prev => ({ ...prev, doppelgangerTargetId: p.id }))}
-              className={`p-3 rounded-xl border text-sm font-bold text-left ${gameState.doppelgangerTargetId === p.id ? 'bg-indigo-950 border-indigo-500 text-indigo-200' : 'bg-slate-900 border-slate-800 text-slate-300'}`}
+              className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left ${gameState.doppelgangerTargetId === p.id ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200 shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}
             >
               {p.name}
             </button>
           ))}
         </div>
 
-        <button onClick={handleConfirmDoppelganger} className="w-full py-4 rounded-2xl bg-indigo-700 text-white font-bold flex items-center justify-center gap-2">
+        <button onClick={handleConfirmDoppelganger} className="w-full py-4 rounded-2xl bg-indigo-700 hover:bg-indigo-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-indigo-950/50 transition">
           <span>KONFIRMASI DOPPELGANGER</span>
           <ArrowRight className="w-5 h-5" />
         </button>
@@ -2268,28 +1985,28 @@ export default function App() {
     const result = gameState.seerResult;
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-cyan-950 border border-cyan-700 text-cyan-400">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-cyan-950/90 border border-cyan-700/60 text-cyan-400 shadow-lg">
             <Eye className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-cyan-400">🔮 SEER PHASE</h2>
-          <p className="text-sm text-slate-300">Pilih 1 pemain untuk diramal perannya.</p>
+          <h2 className="text-2xl font-black text-cyan-400">🔮 SEER PHASE</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diramal perannya.</p>
         </div>
 
         {result ? (
-          <div className="bg-gradient-to-br from-cyan-950 via-slate-900 to-cyan-950 border-2 border-cyan-500 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-            <span className="text-xs font-bold text-cyan-300 uppercase tracking-widest">HASIL RAMALAN SEER</span>
+          <div className="bg-gradient-to-br from-cyan-950 via-slate-900 to-cyan-950 border-2 border-cyan-500/80 rounded-3xl p-6 text-center space-y-4 shadow-2xl animate-fadeIn">
+            <span className="text-[10px] font-black text-cyan-300 uppercase tracking-widest">HASIL RAMALAN SEER</span>
             <div className="space-y-1">
               <h3 className="text-2xl font-black text-white">{result.targetName}</h3>
-              <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-950 border border-cyan-600 text-cyan-300 font-bold text-base">
+              <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-950 border border-cyan-600/80 text-cyan-300 font-bold text-sm">
                 ROLE: {result.displayedRole}
               </div>
             </div>
 
             <button
               onClick={advanceNightPhase}
-              className="w-full py-3.5 rounded-2xl bg-cyan-600 text-slate-950 font-black text-sm shadow-xl"
+              className="w-full py-3.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-cyan-950/50 transition"
             >
               TUTUP HASIL & SELESAI SEER
             </button>
@@ -2300,7 +2017,7 @@ export default function App() {
               <button
                 key={player.id}
                 onClick={() => handleSeerInspect(player.id)}
-                className="p-3 rounded-xl border bg-slate-900 border-slate-800 text-slate-300 hover:bg-cyan-950 text-sm font-bold text-left transition flex items-center justify-between"
+                className="p-3.5 rounded-2xl border bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-cyan-950/80 text-xs sm:text-sm font-bold text-left transition flex items-center justify-between"
               >
                 <span className="truncate">{player.name}</span>
                 <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
@@ -2315,18 +2032,18 @@ export default function App() {
   const renderNightWitch = () => {
     const livingTargets = gameState.players.filter(p => p.alive);
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-950 border border-purple-700 text-purple-400">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-950/90 border border-purple-700/60 text-purple-400 shadow-lg">
             <FlaskConical className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-purple-400">🧪 WITCH PHASE</h2>
-          <p className="text-sm text-slate-300">Pilih penggunaan Heal atau Kill Potion secara blind.</p>
+          <h2 className="text-2xl font-black text-purple-400">🧪 WITCH PHASE</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih penggunaan Heal atau Kill Potion secara blind.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between"><span className="font-bold text-emerald-400 text-sm">❤️ Heal Potion</span></div>
+          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-md">
+            <div className="flex items-center justify-between"><span className="font-bold text-emerald-400 text-xs sm:text-sm">❤️ Heal Potion</span></div>
             <select
               disabled={gameState.witchHealUsed}
               value={gameState.witchHealTargetId || ''}
@@ -2334,15 +2051,15 @@ export default function App() {
                 const val = e.target.value || null;
                 setGameState(prev => ({ ...prev, witchHealTargetId: val, witchHealUsedThisNight: !!val }));
               }}
-              className="w-full py-2 px-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+              className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none"
             >
               <option value="">-- Tebak Target Heal --</option>
               {livingTargets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between"><span className="font-bold text-purple-400 text-sm">☠️ Kill Potion</span></div>
+          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-md">
+            <div className="flex items-center justify-between"><span className="font-bold text-purple-400 text-xs sm:text-sm">☠️ Kill Potion</span></div>
             <select
               disabled={gameState.witchKillUsed}
               value={gameState.witchKillTargetId || ''}
@@ -2350,7 +2067,7 @@ export default function App() {
                 const val = e.target.value || null;
                 setGameState(prev => ({ ...prev, witchKillTargetId: val }));
               }}
-              className="w-full py-2 px-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+              className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none"
             >
               <option value="">-- Pilih Target Kill --</option>
               {livingTargets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -2367,7 +2084,7 @@ export default function App() {
             }));
             advanceNightPhase();
           }}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-purple-950/50 flex items-center justify-center gap-2 transition"
         >
           <span>SELESAIKAN WITCH & PROSES MALAM</span>
           <ArrowRight className="w-5 h-5" />
@@ -2384,13 +2101,13 @@ export default function App() {
     if (!hunter) return null;
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-950 border border-orange-700 text-orange-300">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-950/90 border border-orange-700/60 text-orange-300 shadow-lg">
             <span className="text-3xl">🏹</span>
           </div>
-          <h2 className="text-2xl font-bold text-orange-300">HUNTER REVENGE</h2>
-          <p className="text-sm text-slate-300"><strong>{hunter.name}</strong> tereliminasi. Pilih 1 pemain untuk dibalas dendam.</p>
+          <h2 className="text-2xl font-black text-orange-300">HUNTER REVENGE</h2>
+          <p className="text-xs sm:text-sm text-slate-300"><strong>{hunter.name}</strong> tereliminasi. Pilih 1 pemain untuk dibalas dendam.</p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[50vh] overflow-y-auto">
@@ -2398,7 +2115,7 @@ export default function App() {
             <button
               key={p.id}
               onClick={() => setGameState(prev => ({ ...prev, hunterTargetId: p.id }))}
-              className={`p-3 rounded-xl border text-sm font-bold text-left transition ${gameState.hunterTargetId === p.id ? 'bg-orange-950 border-orange-500 text-orange-200' : 'bg-slate-900 border-slate-800 text-slate-300'}`}
+              className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition ${gameState.hunterTargetId === p.id ? 'bg-orange-950/80 border-orange-500 text-orange-200 shadow-md' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}
             >
               {p.name}
             </button>
@@ -2408,7 +2125,7 @@ export default function App() {
         <button
           disabled={!selected}
           onClick={() => handleHunterRevenge(selected?.id)}
-          className="w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-black"
+          className="w-full py-4 rounded-2xl bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white font-black text-xs sm:text-sm shadow-xl shadow-orange-950/50 transition"
         >
           KONFIRMASI BALAS DENDAM
         </button>
@@ -2420,31 +2137,31 @@ export default function App() {
     const deaths = gameState.lastNightDeaths;
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 text-center space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
         <div className="space-y-3 pt-4">
-          <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-amber-950/80 border border-amber-600/50 text-amber-400 shadow-2xl">
+          <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-amber-950/80 border border-amber-600/50 text-amber-400 shadow-2xl shadow-amber-950/40">
             <Sun className="w-12 h-12" />
           </div>
-          <h2 className="text-3xl font-extrabold text-white">🌅 PAGI HARI {gameState.dayNumber}</h2>
-          <p className="text-sm text-slate-300">Matahari telah terbit di desa.</p>
+          <h2 className="text-3xl font-black text-white">🌅 PAGI HARI {gameState.dayNumber}</h2>
+          <p className="text-xs sm:text-sm text-slate-300">Matahari telah terbit di desa.</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
           {deaths.length === 0 ? (
             <div className="space-y-2">
               <span className="text-4xl">🕊️</span>
-              <h3 className="text-xl font-bold text-emerald-400">Semua Pemain Selamat!</h3>
+              <h3 className="text-xl font-black text-emerald-400">Semua Pemain Selamat!</h3>
               <p className="text-xs text-slate-300">Semalam tidak ada pemain yang tereliminasi.</p>
             </div>
           ) : (
             <div className="space-y-3">
               <span className="text-4xl">☠️</span>
-              <h3 className="text-lg font-bold text-red-400">Pemain Tereliminasi Semalam:</h3>
+              <h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3>
               <div className="space-y-2">
                 {deaths.map(({ player, reason }) => (
-                  <div key={player.id} className="p-3 bg-red-950/60 border border-red-800 rounded-2xl flex items-center justify-between">
-                    <span className="font-extrabold text-white text-base">{player.name}</span>
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-red-900 text-red-200 font-semibold">
+                  <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between">
+                    <span className="font-black text-white text-sm">{player.name}</span>
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">
                       {reason === 'WEREWOLF' ? 'Serangan Werewolf' : reason === 'WITCH' ? 'Racun Witch' : reason === 'SHERIFF' ? 'Eliminasi Sheriff' : reason === 'SHERIFF_MISS' ? 'Salah memilih target Sheriff' : 'Efek Lovers'}
                     </span>
                   </div>
@@ -2462,7 +2179,7 @@ export default function App() {
               gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', `Memulai diskusi Hari ${prev.dayNumber}.`)
             }));
           }}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-black text-base shadow-xl flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-950/40 flex items-center justify-center gap-2 transition"
         >
           <span>LANJUT KE WAKTU DISKUSI</span>
           <ArrowRight className="w-5 h-5" />
@@ -2475,33 +2192,33 @@ export default function App() {
     const isTimerRunning = gameState.discussionEndTimestamp && !gameState.isTimerPaused;
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 text-center space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
         <div className="space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-950 border border-orange-700 text-orange-400">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-950/90 border border-orange-700/60 text-orange-400 shadow-lg">
             <Flame className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-white">🗣️ WAKTU DISKUSI</h2>
+          <h2 className="text-2xl font-black text-white">🗣️ WAKTU DISKUSI</h2>
         </div>
 
-        <div className="bg-slate-900 border-2 border-slate-800 rounded-3xl p-8 space-y-4 shadow-2xl">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">SISA WAKTU DISKUSI</span>
-          <div className="text-6xl font-black font-mono text-amber-400 tracking-wider">
+        <div className="bg-slate-900/90 border-2 border-slate-800/80 rounded-3xl p-8 space-y-4 shadow-2xl">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SISA WAKTU DISKUSI</span>
+          <div className="text-5xl sm:text-6xl font-black font-mono text-amber-400 tracking-wider">
             {formatTime(remainingSeconds)}
           </div>
 
           <div className="flex items-center justify-center gap-3 pt-2">
             {!gameState.discussionEndTimestamp ? (
-              <button onClick={startDiscussionTimer} className="px-6 py-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm flex items-center gap-2">
+              <button onClick={startDiscussionTimer} className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-amber-950/40 transition">
                 <Play className="w-4 h-4 fill-current" />
                 <span>MULAI TIMER</span>
               </button>
             ) : isTimerRunning ? (
-              <button onClick={pauseDiscussionTimer} className="px-6 py-3 rounded-xl bg-slate-800 text-slate-300 font-bold text-sm flex items-center gap-2 border border-slate-700">
+              <button onClick={pauseDiscussionTimer} className="px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm flex items-center gap-2 border border-slate-700 transition">
                 <Pause className="w-4 h-4" />
                 <span>PAUSE</span>
               </button>
             ) : (
-              <button onClick={resumeDiscussionTimer} className="px-6 py-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm flex items-center gap-2">
+              <button onClick={resumeDiscussionTimer} className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-amber-950/40 transition">
                 <Play className="w-4 h-4 fill-current" />
                 <span>RESUME</span>
               </button>
@@ -2509,7 +2226,7 @@ export default function App() {
           </div>
         </div>
 
-        <button onClick={handleFinishDiscussionEarly} className="w-full py-4 rounded-2xl bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center gap-2">
+        <button onClick={handleFinishDiscussionEarly} className="w-full py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition">
           <span>SELESAIKAN DISKUSI & MULAI VOTING</span>
           <ArrowRight className="w-4 h-4" />
         </button>
@@ -2545,27 +2262,27 @@ export default function App() {
     const isTie = topCandidates.length > 1;
 
     return (
-      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6">
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950 border border-red-700 text-red-400">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg">
             <Skull className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-white">🗳️ SESI VOTING</h2>
+          <h2 className="text-2xl font-black text-white">🗳️ SESI VOTING</h2>
         </div>
 
         <div className="space-y-2">
           {livingMayor && !gameState.mayorRevealed && (
-            <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 text-slate-950 font-black text-sm">
+            <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-md transition">
               👑 UNGKAP IDENTITAS MAYOR
             </button>
           )}
         </div>
 
         {!isAllVotesDone && currentVoter ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+          <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <span className="text-xs font-bold text-slate-400">PEMILIH ({currentVoterIndex + 1}/{livingPlayers.length})</span>
-              <span className="text-lg font-black text-amber-400">{currentVoter.name}</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PEMILIH ({currentVoterIndex + 1}/{livingPlayers.length})</span>
+              <span className="text-base sm:text-lg font-black text-amber-400">{currentVoter.name}</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[35vh] overflow-y-auto">
@@ -2573,7 +2290,7 @@ export default function App() {
                 <button
                   key={target.id}
                   onClick={() => handleVoteSubmit(currentVoter.id, target.id)}
-                  className="p-3 rounded-xl border bg-slate-950 border-slate-800 text-slate-300 hover:bg-red-950 text-sm font-bold text-left transition flex items-center justify-between"
+                  className="p-3.5 rounded-2xl border bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-red-950/80 text-xs sm:text-sm font-bold text-left transition flex items-center justify-between"
                 >
                   <span className="truncate">{target.name}</span>
                   <Skull className="w-4 h-4 text-red-400 shrink-0" />
@@ -2581,23 +2298,23 @@ export default function App() {
               ))}
             </div>
 
-            <button onClick={() => handleVoteSubmit(currentVoter.id, null)} className="w-full py-3 rounded-2xl border border-slate-600 bg-slate-800 text-slate-200 font-black text-sm">
+            <button onClick={() => handleVoteSubmit(currentVoter.id, null)} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition">
               ⏭️ SKIP VOTE
             </button>
           </div>
         ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-2xl">
-            <h3 className="text-lg font-bold text-white text-center">HASIL REKAP VOTING</h3>
+          <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-6 space-y-5 shadow-2xl">
+            <h3 className="text-base font-bold text-white text-center">HASIL REKAP VOTING</h3>
 
             {isTie && (
-              <div className="p-3 bg-amber-950/80 border border-amber-600 rounded-2xl text-amber-200 text-xs text-center font-bold">
+              <div className="p-3 bg-amber-950/80 border border-amber-600/80 rounded-2xl text-amber-200 text-xs text-center font-bold leading-relaxed">
                 ⚠️ HASIL SERI: {topCandidates.map(c => c.player.name).join(' & ')} memperoleh suara terbanyak yang sama ({maxVotes} suara).
               </div>
             )}
 
             <div className="space-y-3">
               {sortedCandidates.length === 0 ? (
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-center text-sm text-slate-400">
+                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">
                   Semua pemain memilih skip vote. Tidak ada pemain yang tereliminasi.
                 </div>
               ) : (
@@ -2606,17 +2323,17 @@ export default function App() {
                   const percentage = Math.min(100, (count / livingPlayers.length) * 100);
 
                   return (
-                    <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500' : 'bg-slate-950 border-slate-800'}`}>
-                      <div className="flex justify-between items-center text-sm font-bold">
-                        <span className={isTop ? 'text-red-400 font-extrabold' : 'text-white'}>
+                    <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500/80 shadow-md' : 'bg-slate-950/80 border-slate-800/80'}`}>
+                      <div className="flex justify-between items-center text-xs sm:text-sm font-bold">
+                        <span className={isTop ? 'text-red-400 font-black' : 'text-white'}>
                           {player.name} {isTop && '🔥'}
                         </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs ${isTop ? 'bg-red-600 text-white font-black' : 'bg-slate-800 text-slate-400'}`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isTop ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
                           {count} Suara
                         </span>
                       </div>
 
-                      <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                      <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all duration-500 rounded-full ${isTop ? 'bg-gradient-to-r from-red-600 to-amber-500' : 'bg-slate-600'}`}
                           style={{ width: `${Math.max(8, percentage)}%` }}
@@ -2628,7 +2345,7 @@ export default function App() {
               )}
             </div>
 
-            <button onClick={resolveVotingResults} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 text-white font-bold text-base shadow-xl flex items-center justify-center gap-2">
+            <button onClick={resolveVotingResults} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition">
               <span>PROSES HASIL VOTING</span>
               <ArrowRight className="w-5 h-5" />
             </button>
@@ -2643,35 +2360,35 @@ export default function App() {
     const isJesterWin = gameState.winner === 'JESTER';
 
     return (
-      <div className="max-w-xl mx-auto p-4 sm:p-6 text-center space-y-6">
+      <div className="max-w-xl mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
         <div className="space-y-4 pt-4">
           <div className={`inline-flex items-center justify-center p-5 rounded-3xl border shadow-2xl ${
-            isWargaWin ? 'bg-emerald-950 border-emerald-600 text-emerald-400' : isJesterWin ? 'bg-pink-950 border-pink-600 text-pink-400' : 'bg-red-950 border-red-600 text-red-400'
+            isWargaWin ? 'bg-emerald-950/90 border-emerald-600/60 text-emerald-400 shadow-emerald-950/50' : isJesterWin ? 'bg-pink-950/90 border-pink-600/60 text-pink-400 shadow-pink-950/50' : 'bg-red-950/90 border-red-600/60 text-red-400 shadow-red-950/50'
           }`}>
             <Crown className="w-16 h-16 animate-bounce" />
           </div>
-          <h2 className={`text-3xl font-black uppercase tracking-wider ${isWargaWin ? 'text-emerald-400' : isJesterWin ? 'text-pink-400' : 'text-red-400'}`}>
+          <h2 className={`text-2xl sm:text-3xl font-black uppercase tracking-wider ${isWargaWin ? 'text-emerald-400' : isJesterWin ? 'text-pink-400' : 'text-red-400'}`}>
             {isWargaWin ? '🏆 TIM WARGA MENANG' : isJesterWin ? '🃏 JESTER MENANG' : '🐺 TIM WEREWOLF MENANG'}
           </h2>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3 shadow-xl text-left">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">HASIL PERAN AKHIR PEMAIN</h3>
+        <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-3 shadow-2xl text-left">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">HASIL PERAN AKHIR PEMAIN</h3>
           <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
             {gameState.players.map(p => {
               const meta = ROLES[p.role];
               return (
-                <div key={p.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl">{meta?.icon}</span>
+                <div key={p.id} className="p-3.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{meta?.icon}</span>
                     <div>
-                      <span className="font-bold text-white text-sm block">{p.name}</span>
-                      <span className={`font-semibold ${meta?.color}`}>{meta?.name}</span>
+                      <span className="font-bold text-white text-xs sm:text-sm block">{p.name}</span>
+                      <span className={`font-bold ${meta?.color}`}>{meta?.name}</span>
                     </div>
                   </div>
 
-                  <span className={`px-2.5 py-1 rounded-full font-bold border ${p.alive ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-red-950 text-red-400 border-red-900'}`}>
-                    {p.alive ? '🟢 Bertahan Hidup' : `☠️ Mati (${p.deathReason || 'Eliminasi'})`}
+                  <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] border ${p.alive ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/80' : 'bg-red-950/80 text-red-400 border-red-900/80'}`}>
+                    {p.alive ? '🟢 Hidup' : `☠️ Mati (${p.deathReason || 'Eliminasi'})`}
                   </span>
                 </div>
               );
@@ -2680,11 +2397,11 @@ export default function App() {
         </div>
 
         <div className="space-y-3 pt-2">
-          <button onClick={handleRestartSamePlayers} className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 text-slate-950 font-black text-base shadow-xl flex items-center justify-center gap-2">
+          <button onClick={handleRestartSamePlayers} className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-950/40 flex items-center justify-center gap-2 transition">
             <RefreshCw className="w-5 h-5" />
             <span>MAIN LAGI DENGAN PEMAIN SAMA</span>
           </button>
-          <button onClick={handleNewGame} className="w-full py-3.5 rounded-2xl bg-slate-800 text-white font-bold text-sm border border-slate-700">
+          <button onClick={handleNewGame} className="w-full py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm border border-slate-700/80 transition">
             GAME BARU
           </button>
         </div>
@@ -2717,7 +2434,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
+      {/* Background Ambient Glows */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-900/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-950/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
+
       {renderToast()}
       {renderLoverDeathNotice()}
       {renderConfirmModal()}
