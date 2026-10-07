@@ -88,7 +88,7 @@ function shuffle(array) {
 function createInitialGameState() {
   return {
     players: [],
-    currentPhase: 'HOME', // HOME | RULES | SETUP | ROLE_SUMMARY | ROLE_REVEAL | NIGHT_INTRO | NIGHT_CUPID | NIGHT_WEREWOLF | NIGHT_GUARDIAN | NIGHT_DOCTOR | NIGHT_SHERIFF | NIGHT_DOPPELGANGER | NIGHT_SEER | NIGHT_WITCH | MORNING | DISCUSSION | VOTING | GAME_OVER
+    currentPhase: 'HOME', // HOME | RULES | SETUP | ROLE_SUMMARY | ROLE_REVEAL | DOPPELGANGER_REVEAL | NIGHT_INTRO | NIGHT_CUPID | NIGHT_WEREWOLF | NIGHT_GUARDIAN | NIGHT_DOCTOR | NIGHT_SHERIFF | NIGHT_DOPPELGANGER | NIGHT_SEER | NIGHT_WITCH | MORNING | DISCUSSION | VOTING | GAME_OVER
     nightNumber: 1,
     dayNumber: 1,
     
@@ -110,6 +110,8 @@ function createInitialGameState() {
     doppelgangerTargetId: null,
     doppelgangerCopied: false,
     doppelgangerRoleChangeNotice: null,
+    doppelgangerRevealNextPhase: null,
+    doppelgangerRevealWinner: null,
     mayorRevealed: false,
     seerTargetId: null,
     seerResult: null,
@@ -552,6 +554,22 @@ export default function App() {
     if (winResult) {
       const winText = winResult === 'WARGA' ? 'Kemenangan Tim WARGA!' : winResult === 'WEREWOLF' ? 'Kemenangan Tim WEREWOLF!' : 'JESTER memenangkan permainan!';
       log = addLog(log, night, day, 'WIN', winText);
+    }
+
+    // If the Doppelganger's target died, pause the game in a dedicated reveal session.
+    // The Doppelganger must first be told that their target is dead and then shown the copied role.
+    if (doppelgangerRoleChangeNotice) {
+      return {
+        ...tempState,
+        currentPhase: 'DOPPELGANGER_REVEAL',
+        doppelgangerRevealNextPhase: winResult ? 'GAME_OVER' : 'MORNING',
+        doppelgangerRevealWinner: winResult || null,
+        winner: winResult || null,
+        gameLog: log
+      };
+    }
+
+    if (winResult) {
       return { ...tempState, currentPhase: 'GAME_OVER', winner: winResult, gameLog: log };
     }
 
@@ -815,6 +833,25 @@ export default function App() {
       const eliminatedWasJester = eliminatedPlayer?.role === 'JESTER';
       if (eliminatedWasJester) {
         log = addLog(log, nightNumber, dayNumber, 'WIN', `Jester ${eliminatedPlayer.name} berhasil tereliminasi lewat voting dan menang!`);
+
+        // If the eliminated Jester was also the Doppelganger's target,
+        // show the dedicated Doppelganger reveal session before Game Over.
+        if (doppelgangerRoleChangeNotice) {
+          setGameState({
+            ...gameState,
+            players: updatedPlayers,
+            gameLog: log,
+            lastDayDeaths: dayDeaths,
+            loverDeathNotice,
+            doppelgangerRoleChangeNotice,
+            currentPhase: 'DOPPELGANGER_REVEAL',
+            doppelgangerRevealNextPhase: 'GAME_OVER',
+            doppelgangerRevealWinner: 'JESTER',
+            winner: 'JESTER'
+          });
+          return;
+        }
+
         const jesterState = {
           ...gameState,
           players: updatedPlayers,
@@ -848,6 +885,19 @@ export default function App() {
     const winResult = checkWinConditions(tempState);
     if (winResult) {
       log = addLog(log, nightNumber, dayNumber, 'WIN', winResult === 'WARGA' ? 'Kemenangan Tim WARGA!' : 'Kemenangan Tim WEREWOLF!');
+    }
+
+    if (doppelgangerRoleChangeNotice) {
+      // Pause here so the Doppelganger gets a dedicated reveal session before the game continues.
+      setGameState({
+        ...tempState,
+        currentPhase: 'DOPPELGANGER_REVEAL',
+        doppelgangerRevealNextPhase: winResult ? 'GAME_OVER' : 'NIGHT_INTRO',
+        doppelgangerRevealWinner: winResult || null,
+        winner: winResult || null,
+        gameLog: log
+      });
+    } else if (winResult) {
       setGameState({
         ...tempState,
         currentPhase: 'GAME_OVER',
@@ -1238,6 +1288,102 @@ export default function App() {
     );
   };
 
+  const continueAfterDoppelgangerReveal = () => {
+    setGameState(prev => {
+      const nextPhase = prev.doppelgangerRevealNextPhase;
+      const winner = prev.doppelgangerRevealWinner;
+
+      if (nextPhase === 'GAME_OVER') {
+        return {
+          ...prev,
+          currentPhase: 'GAME_OVER',
+          winner,
+          doppelgangerRoleChangeNotice: null,
+          doppelgangerRevealNextPhase: null,
+          doppelgangerRevealWinner: null
+        };
+      }
+
+      if (nextPhase === 'MORNING') {
+        return {
+          ...prev,
+          currentPhase: 'MORNING',
+          doppelgangerRoleChangeNotice: null,
+          doppelgangerRevealNextPhase: null,
+          doppelgangerRevealWinner: null
+        };
+      }
+
+      return {
+        ...prev,
+        currentPhase: 'NIGHT_INTRO',
+        nightNumber: prev.nightNumber + 1,
+        dayNumber: prev.dayNumber + 1,
+        votes: {},
+        currentVoterIndex: 0,
+        discussionEndTimestamp: null,
+        doppelgangerRoleChangeNotice: null,
+        doppelgangerRevealNextPhase: null,
+        doppelgangerRevealWinner: null,
+        gameLog: addLog(prev.gameLog, prev.nightNumber + 1, prev.dayNumber + 1, 'INFO', `Memulai Malam ${prev.nightNumber + 1}.`)
+      };
+    });
+  };
+
+  const renderDoppelgangerReveal = () => {
+    const notice = gameState.doppelgangerRoleChangeNotice;
+    if (!notice) return renderNightIntro();
+
+    const newRole = ROLES[notice.newRole] || {
+      name: notice.newRole,
+      team: 'Unknown',
+      icon: '🎭',
+      color: 'text-indigo-300',
+      bg: 'bg-indigo-950/80',
+      border: 'border-indigo-600',
+      desc: 'Role baru Doppelganger.'
+    };
+
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="rounded-3xl border border-indigo-500/50 bg-slate-900 shadow-2xl shadow-indigo-950/40 overflow-hidden">
+          <div className="p-6 sm:p-8 text-center">
+            <div className="text-xs font-black tracking-[0.25em] text-indigo-400 uppercase">🎭 SESI DOPPELGANGER</div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white mt-3">Targetmu telah mati</h1>
+            <p className="text-slate-400 mt-3 leading-relaxed">
+              <strong className="text-white">{notice.targetName}</strong>, target yang kamu pilih pada Malam 1, sudah tereliminasi.
+            </p>
+
+            <div className="mt-7 rounded-2xl border border-slate-700 bg-slate-950 p-5">
+              <div className="text-xs font-black tracking-widest text-slate-500 uppercase">Role target</div>
+              <div className="text-2xl font-black text-white mt-2">{newRole.icon} {newRole.name}</div>
+              <div className="text-sm text-slate-400 mt-1">Role ini sekarang menjadi role-mu.</div>
+            </div>
+
+            <div className={`mt-4 rounded-2xl border ${newRole.border} ${newRole.bg} p-5`}>
+              <div className="text-xs font-black tracking-widest text-indigo-300 uppercase">Role barumu</div>
+              <div className={`text-3xl font-black mt-2 ${newRole.color}`}>{newRole.icon} {newRole.name}</div>
+              <div className="text-sm text-slate-300 mt-2">Tim: <strong>{newRole.team}</strong></div>
+              <p className="text-sm text-slate-300 mt-3 leading-relaxed">{newRole.desc}</p>
+            </div>
+
+            <div className="mt-6 rounded-xl bg-indigo-950/50 border border-indigo-900/70 p-4 text-sm text-indigo-100">
+              Mulai sekarang, <strong>{notice.playerName}</strong> tidak lagi menggunakan role Doppelganger. Gunakan role <strong>{newRole.name}</strong> dan kondisi kemenangan role tersebut.
+            </div>
+
+            <button
+              onClick={continueAfterDoppelgangerReveal}
+              className="w-full mt-7 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black transition flex items-center justify-center gap-2"
+            >
+              <Check className="w-5 h-5" />
+              <span>PAHAM, LANJUTKAN PERMAINAN</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderHeader = () => {
     if (gameState.currentPhase === 'HOME' || gameState.currentPhase === 'SETUP') return null;
 
@@ -1252,6 +1398,10 @@ export default function App() {
       case 'ROLE_REVEAL':
         phaseBadge = 'PEMBAGIAN ROLE';
         phaseIcon = <UserCheck className="w-4 h-4 text-cyan-400" />;
+        break;
+      case 'DOPPELGANGER_REVEAL':
+        phaseBadge = 'SESI DOPPELGANGER';
+        phaseIcon = <span>🎭</span>;
         break;
       case 'NIGHT_INTRO':
       case 'NIGHT_CUPID':
@@ -2401,54 +2551,6 @@ export default function App() {
     );
   };
 
-  const renderDoppelgangerRoleChangeNotice = () => {
-    const notice = gameState.doppelgangerRoleChangeNotice;
-    if (!notice) return null;
-
-    const newRole = ROLES[notice.newRole] || { name: notice.newRole, icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/80', border: 'border-indigo-600' };
-
-    return (
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-3xl border border-indigo-500/60 bg-slate-900 shadow-2xl shadow-indigo-950/60 overflow-hidden">
-          <div className="p-6 text-center space-y-5">
-            <div className="mx-auto w-20 h-20 rounded-full bg-indigo-950 border border-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-950">
-              <span className="text-5xl">🎭</span>
-            </div>
-            <div>
-              <div className="text-xs font-black tracking-[0.2em] text-indigo-400 uppercase">DOPPELGANGER AKTIF</div>
-              <h2 className="text-2xl font-black text-white mt-2">Peranmu telah berubah!</h2>
-              <p className="text-sm text-slate-400 mt-2">Target yang kamu pilih, <strong className="text-white">{notice.targetName}</strong>, telah mati.</p>
-            </div>
-
-            <div className="flex items-center justify-center gap-3">
-              <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950 p-4">
-                <div className="text-xs text-slate-500 uppercase font-bold">Sebelumnya</div>
-                <div className="text-lg font-black text-slate-300 mt-1">🎭 Doppelganger</div>
-              </div>
-              <ArrowRight className="w-6 h-6 text-indigo-400 shrink-0" />
-              <div className={`flex-1 rounded-2xl border ${newRole.border} ${newRole.bg} p-4`}>
-                <div className="text-xs text-indigo-300 uppercase font-bold">Sekarang</div>
-                <div className={`text-lg font-black ${newRole.color} mt-1`}>{newRole.icon} {newRole.name}</div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-indigo-950/50 border border-indigo-800/60 p-4 text-sm text-indigo-100">
-              Mulai sekarang <strong>{notice.playerName}</strong> menggunakan kemampuan dan kondisi kemenangan dari role <strong>{newRole.name}</strong>.
-            </div>
-
-            <button
-              onClick={() => setGameState(prev => ({ ...prev, doppelgangerRoleChangeNotice: null }))}
-              className="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black transition flex items-center justify-center gap-2"
-            >
-              <Check className="w-5 h-5" />
-              <span>PAHAM, LANJUTKAN</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const renderCurrentPhase = () => {
     switch (gameState.currentPhase) {
       case 'HOME':
@@ -2459,6 +2561,8 @@ export default function App() {
         return renderRoleSummary();
       case 'ROLE_REVEAL':
         return renderRoleReveal();
+      case 'DOPPELGANGER_REVEAL':
+        return renderDoppelgangerReveal();
       case 'NIGHT_INTRO':
         return renderNightIntro();
       case 'NIGHT_CUPID':
@@ -2493,7 +2597,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-500 selection:text-slate-950 flex flex-col">
       {renderToast()}
-      {renderDoppelgangerRoleChangeNotice()}
       {renderLoverDeathNotice()}
       {renderConfirmModal()}
       {renderRulesModal()}
