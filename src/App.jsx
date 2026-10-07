@@ -400,7 +400,7 @@ export default function App() {
       }
 
       const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
-      if (doppel && nightNumber === 1 && !prev.doppelgangerTargetId && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_DOCTOR', 'NIGHT_SHERIFF')) {
+      if (doppel && nightNumber === 1 && !prev.doppelgangerTargetId && prev.currentPhase !== 'NIGHT_DOPPELGANGER' && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_DOCTOR', 'NIGHT_SHERIFF')) {
         return { ...prev, currentPhase: 'NIGHT_DOPPELGANGER' };
       }
 
