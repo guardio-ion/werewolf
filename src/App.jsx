@@ -6,127 +6,17 @@ import {
   Info, Check, RefreshCw, Award, Download
 } from 'lucide-react';
 
-// ==========================================
-// 1. CONSTANTS & CONFIG
-// ==========================================
-const LOCAL_STORAGE_KEY = 'WEREWOLF_MODERATOR_ASSISTANT_STATE_V4';
-const GAME_STATE_VERSION = 4;
-
-const ROLES = {
-  WARGA: { name: 'Warga', team: 'Warga', icon: '👨', color: 'text-slate-300', bg: 'bg-slate-900/90', border: 'border-slate-700', accent: 'from-slate-800 to-slate-950', desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi seluruh ancaman.' },
-  WEREWOLF: { name: 'Werewolf', team: 'Evil', icon: '🐺', color: 'text-red-400', bg: 'bg-red-950/90', border: 'border-red-600/60', accent: 'from-red-900 via-red-950 to-slate-950', desc: 'Setiap malam memilih 1 korban. Sesama Werewolf saling mengetahui.' },
-  LYCAN: { name: 'Lycan', team: 'Warga', icon: '🌙', color: 'text-zinc-200', bg: 'bg-zinc-900/90', border: 'border-zinc-600', accent: 'from-zinc-800 to-slate-950', desc: 'Berada di tim Warga dan tidak memiliki aksi malam. Seer akan melihat Lycan sebagai Werewolf.' },
-  SEER: { name: 'Seer', team: 'Warga', icon: '🔮', color: 'text-cyan-400', bg: 'bg-cyan-950/90', border: 'border-cyan-600/60', accent: 'from-cyan-950 via-slate-900 to-slate-950', desc: 'Setiap malam memeriksa 1 pemain untuk mengetahui wujud/perannya. Lycan terlihat sebagai Werewolf.' },
-  GUARDIAN: { name: 'Guardian', team: 'Warga', icon: '🛡️', color: 'text-blue-400', bg: 'bg-blue-950/90', border: 'border-blue-600/60', accent: 'from-blue-950 via-slate-900 to-slate-950', desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak boleh melindungi pemain yang sama dua malam berturut-turut.' },
-  CUPID: { name: 'Cupid', team: 'Warga', icon: '💘', color: 'text-pink-400', bg: 'bg-pink-950/90', border: 'border-pink-600/60', accent: 'from-pink-950 via-slate-900 to-slate-950', desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.' },
-  MAYOR: { name: 'Mayor', team: 'Warga', icon: '👑', color: 'text-amber-400', bg: 'bg-amber-950/90', border: 'border-amber-600/60', accent: 'from-amber-950 via-slate-900 to-slate-950', desc: 'Sekali per game dapat mengungkapkan identitas sebagai Mayor. Setelah terungkap, bobot suaranya menjadi 2 pada voting.' },
-  SHERIFF: { name: 'Sheriff', team: 'Warga', icon: '⭐', color: 'text-yellow-300', bg: 'bg-yellow-950/90', border: 'border-yellow-600/60', accent: 'from-yellow-950 via-slate-900 to-slate-950', desc: 'Sekali per game, pada malam hari memilih 1 pemain untuk diuji. Jika target adalah Werewolf, target tereliminasi. Jika bukan, Sheriff tereliminasi.' },
-  HUNTER: { name: 'Hunter', team: 'Warga', icon: '🏹', color: 'text-orange-300', bg: 'bg-orange-950/90', border: 'border-orange-600/60', accent: 'from-orange-950 via-slate-900 to-slate-950', desc: 'Jika mati, Hunter dapat memilih 1 pemain lain untuk dieliminasi sebagai balas dendam.' },
-  TRAITOR: { name: 'Traitor', team: 'Warga', icon: '🗡️', color: 'text-slate-200', bg: 'bg-slate-900/90', border: 'border-slate-700', accent: 'from-slate-800 to-slate-950', desc: 'Awalnya di kubu Warga. Jika seluruh Werewolf mati dan Traitor masih hidup, ia berubah menjadi Werewolf.' },
-  WOLF_CUB: { name: 'Wolf Cub', team: 'Evil', icon: '🐺', color: 'text-rose-300', bg: 'bg-rose-950/90', border: 'border-rose-600/60', accent: 'from-rose-950 via-slate-900 to-slate-950', desc: 'Jika Wolf Cub mati, Werewolf mendapat amukan pada malam berikutnya dan dapat membunuh 2 pemain.' },
-  WITCH: { name: 'Witch', team: 'Warga', icon: '🧪', color: 'text-purple-400', bg: 'bg-purple-950/90', border: 'border-purple-600/60', accent: 'from-purple-950 via-slate-900 to-slate-950', desc: 'Memiliki Heal Potion dan Kill Potion, masing-masing 1x. Witch tidak melihat korban Werewolf dan menebak secara blind.' },
-  JESTER: { name: 'Jester', team: 'Neutral', icon: '🃏', color: 'text-pink-300', bg: 'bg-pink-950/90', border: 'border-pink-600/60', accent: 'from-pink-950 via-slate-900 to-slate-950', desc: 'Menang sendiri jika berhasil tereliminasi melalui voting siang hari.' },
-  DOPPELGANGER: { name: 'Doppelganger', team: 'Neutral', icon: '🎭', color: 'text-indigo-300', bg: 'bg-indigo-950/90', border: 'border-indigo-600/60', accent: 'from-indigo-950 via-slate-900 to-slate-950', desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger menggantikan role-nya.' }
-};
-
-const ROLE_KEYS = Object.keys(ROLES);
-
-const GAME_PRESETS = [
-  { id: 'quick_8', name: '⚡ Quick 8 Players', desc: 'Permainan cepat & intens untuk grup kecil (8 Pemain).', count: 8, roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WARGA: 4 } },
-  { id: 'classic_10', name: '📜 Classic 10 Players', desc: 'Komposisi standar seimbang untuk 10 Pemain.', count: 10, roles: { WEREWOLF: 2, SEER: 1, GUARDIAN: 1, WITCH: 1, WARGA: 5 } },
-  { id: 'balanced_12', name: '🛡️ Balanced 12 Players', desc: 'Pengalaman penuh dengan peran khusus untuk 12 Pemain.', count: 12, roles: { WEREWOLF: 3, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, WARGA: 4 } },
-  { id: 'chaos_15', name: '🔥 Chaos 15 Players', desc: 'Mode seru & menantang untuk grup besar (15 Pemain).', count: 15, roles: { WEREWOLF: 3, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, JESTER: 1, TRAITOR: 1, WARGA: 3 } },
-  { id: 'epic_18', name: '🏰 Epic 18 Players', desc: 'Skala besar dengan variasi role melimpah (18 Pemain).', count: 18, roles: { WEREWOLF: 4, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, MAYOR: 1, JESTER: 1, TRAITOR: 1, WARGA: 4 } },
-  { id: 'war_20', name: '⚔️ Total War 20 Players', desc: 'Pertempuran puncak seluruh role khusus (20 Pemain).', count: 20, roles: { WEREWOLF: 4, WOLF_CUB: 1, SEER: 1, GUARDIAN: 1, WITCH: 1, HUNTER: 1, CUPID: 1, SHERIFF: 1, MAYOR: 1, LYCAN: 1, DOPPELGANGER: 1, JESTER: 1, TRAITOR: 1, WARGA: 5 } }
-];
-
-const PARTICIPANT_LIST = [
-  'Adinda Ramadhani Himawan', 'Ahmad Raditya', 'Aisyanabila Maiza Ramadhany', 'Annastasya Cahya Kamila F.', 'Cesar Hafidz Ausafurrizal', 'Citra Alea', 'Dysto Arbi', 'Dzakki Alvanno Luke Evendi', 'Ega Noval Saputra', 'Evan Haris Pramana', 'Galih Tata Arung Samudra', 'Ghaida Mazaya Aqila Hariyadi', 'Hasan Farros Mubarok', "Hirdan Ma'ruf Besari", 'Keisya Auliayanti', 'Kyna Azarina Paristuti', 'M. Naufal El Shafa Hadi', 'Maiza Reihanadiva', 'Mutia Lutfi Safira', 'Nayya Anggun Almaeda', 'Rafi Azmi Putra Wasono', 'Raihan Ariq Ghossan', 'Renando Dewantoro Sakti', 'Reyhan Arya Putra Pratama', 'Rizky Pratama Agico Anantyan', 'Rizky Valiant Suwondo', 'Rorensa Desicha Pramesti', 'Safira Azka Gina', 'Salwa Refaldina Paramesti', 'Satria Aji Syahputra', 'Shafaa Rizky Savinna Mashuri', 'Sonia Velita Lukita', 'Tidar Endah Rahmawati', 'Zahra Anindhita Wicaksono', 'Zahra Mai Kalinda', 'Zahro Habibah'
-];
+// IMPORT DARI FILE YANG SUDAH DIPECAH
+import { ROLES, ROLE_KEYS } from './constants/roles';
+import { GAME_PRESETS, PARTICIPANT_LIST } from './constants/presets';
+import { 
+  LOCAL_STORAGE_KEY, GAME_STATE_VERSION, 
+  isWolfAligned, getEffectiveTeam, normalizePlayer, loadSavedGame, 
+  shuffle, createInitialGameState, addLog, pushUndoState 
+} from './utils/gameLogic';
 
 // ==========================================
-// 2. HELPER FUNCTIONS & GAME LOGIC
-// ==========================================
-function isWolfAligned(player) {
-  return Boolean(player && (player.role === 'WEREWOLF' || player.role === 'WOLF_CUB' || (player.role === 'TRAITOR' && player.convertedToWerewolf)));
-}
-
-function getEffectiveTeam(player) {
-  if (!player) return null;
-  if (player.convertedToWerewolf) return 'Evil';
-  if (player.role === 'WEREWOLF' || player.role === 'WOLF_CUB') return 'Evil';
-  if (player.role === 'JESTER') return 'Neutral';
-  return ROLES[player.role]?.team || 'Warga';
-}
-
-function normalizePlayer(player) {
-  const role = player?.role || 'WARGA';
-  return {
-    ...player,
-    id: String(player?.id || `player_${Date.now()}_${Math.random().toString(36).slice(2)}`),
-    name: String(player?.name || 'Pemain'),
-    role,
-    team: player?.team || getEffectiveTeam({ ...player, role }),
-    alive: player?.alive !== false,
-    loverId: player?.loverId || null,
-    convertedToWerewolf: Boolean(player?.convertedToWerewolf),
-    doppelgangerCopied: Boolean(player?.doppelgangerCopied),
-    protectedLastNight: Boolean(player?.protectedLastNight),
-    protectedThisNight: Boolean(player?.protectedThisNight),
-    hunterRevengeUsed: Boolean(player?.hunterRevengeUsed),
-    deathReason: player?.deathReason || null,
-    deathNight: player?.deathNight ?? null,
-    deathDay: player?.deathDay ?? null
-  };
-}
-
-function loadSavedGame() {
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!saved) return null;
-    const parsed = JSON.parse(saved);
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.players) || typeof parsed.currentPhase !== 'string') return null;
-    if (parsed.stateVersion && parsed.stateVersion !== GAME_STATE_VERSION) return null;
-    return parsed;
-  } catch (error) { return null; }
-}
-
-function shuffle(array) {
-  const result = [...array];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
-function createInitialGameState() {
-  return {
-    stateVersion: GAME_STATE_VERSION, players: [], currentPhase: 'HOME', nightNumber: 1, dayNumber: 1,
-    discussionEndTimestamp: null, discussionDurationSeconds: 300, isTimerPaused: false, pausedRemainingSeconds: null,
-    werewolfTargetId: null, werewolfTargetIds: [], wolfCubRagePending: false, guardianTargetId: null,
-    sheriffTargetId: null, sheriffUsed: false, sheriffSkippedNights: [], sheriffResolved: false,
-    doppelgangerTargetId: null, doppelgangerCopied: false, doppelgangerRoleChangeNotice: null,
-    doppelgangerRevealNextPhase: null, doppelgangerRevealWinner: null, mayorRevealed: false, seerTargetId: null, seerResult: null,
-    witchHealUsedThisNight: false, witchHealTargetId: null, witchKillTargetId: null, hunterTargetId: null, hunterPending: false,
-    cupidLover1Id: null, cupidLover2Id: null, witchHealUsed: false, witchKillUsed: false, cupidUsed: false, nightSkips: {},
-    currentVoterIndex: 0, votes: {}, revealPlayerIndex: 0, isRoleCardOpen: false, gameLog: [], lastNightDeaths: [],
-    lastDayDeaths: [], loverDeathNotice: [], roleCounts: {}, winner: null, undoStack: []
-  };
-}
-
-function addLog(logs, nightNumber, dayNumber, type, message) {
-  const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-  return [{ id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), timestamp: timeStr, nightNumber, dayNumber, type, message }, ...logs];
-}
-
-function pushUndoState(state) {
-  const { undoStack, ...rest } = state;
-  return [rest, ...(undoStack || []).slice(0, 4)];
-}
-
-// ==========================================
-// 3. MAIN APP COMPONENT
+// MAIN APP COMPONENT
 // ==========================================
 export default function App() {
   const [gameState, setGameState] = useState(() => {
@@ -152,9 +42,7 @@ export default function App() {
   const discussionTransitionLock = useRef(false);
   const [remainingSeconds, setRemainingSeconds] = useState(300);
 
-  // ==========================================
-  // 3.1 EFFECTS & LIFECYCYCLES
-  // ==========================================
+  // EFFECTS
   useEffect(() => {
     if (Object.keys(roleCountsDraft).length === 0 && playerCount > 0) {
       setRoleCountsDraft({ WARGA: Math.max(0, playerCount - 4), WEREWOLF: 1, GUARDIAN: 1, SEER: 1, WITCH: 1 });
@@ -185,30 +73,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [gameState.currentPhase, gameState.discussionEndTimestamp, gameState.isTimerPaused, gameState.pausedRemainingSeconds]);
 
-  // FITUR BARU: Text-to-Speech (Suara Moderator)
-  useEffect(() => {
-    if (privacyMode || !('speechSynthesis' in window)) return;
-    const synth = window.speechSynthesis;
-    let textToSpeak = "";
-    if (gameState.currentPhase === 'NIGHT_INTRO') textToSpeak = `Malam ${gameState.nightNumber}. Semua pemain tutup mata.`;
-    else if (gameState.currentPhase === 'MORNING') textToSpeak = `Pagi hari ${gameState.dayNumber}. Matahari terbit.`;
-    else if (gameState.currentPhase === 'DISCUSSION') textToSpeak = `Waktu diskusi dimulai.`;
-    else if (gameState.currentPhase === 'VOTING') textToSpeak = `Waktu voting dimulai.`;
-    else if (gameState.currentPhase === 'GAME_OVER' && gameState.winner) {
-      const winText = gameState.winner === 'WARGA' ? 'Tim Warga menang' : gameState.winner === 'WEREWOLF' ? 'Tim Werewolf menang' : 'Jester menang';
-      textToSpeak = `Permainan selesai. ${winText}.`;
-    }
-    if (textToSpeak) {
-      synth.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      utterance.lang = 'id-ID'; utterance.rate = 0.9;
-      synth.speak(utterance);
-    }
-  }, [gameState.currentPhase, gameState.nightNumber, gameState.dayNumber, privacyMode, gameState.winner]);
-
-  // ==========================================
-  // 3.2 STATE HANDLERS & ACTIONS
-  // ==========================================
+  // HANDLERS
   function triggerToast(msg) { setToastMessage(msg); }
 
   function triggerAutoTransitionToVoting() {
@@ -216,8 +81,7 @@ export default function App() {
     discussionTransitionLock.current = true;
     setGameState(prev => {
       if (prev.currentPhase !== 'DISCUSSION') return prev;
-      const newLog = addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.');
-      return { ...prev, currentPhase: 'VOTING', currentVoterIndex: 0, votes: {}, gameLog: newLog };
+      return { ...prev, currentPhase: 'VOTING', currentVoterIndex: 0, votes: {}, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.') };
     });
   }
 
@@ -262,26 +126,23 @@ export default function App() {
       if (state.nightNumber === 1 && state.players.some(p => p.role === 'CUPID' && p.alive) && !state.cupidUsed && !state.nightSkips?.CUPID && state.currentPhase === 'NIGHT_INTRO') {
         return { ...commit, currentPhase: 'NIGHT_CUPID' };
       }
-
       const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
       const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
       if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
         return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
       }
-
       const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
       if (livingWerewolves.length > 0 && wolfTargets.length > 0 && !state.werewolfTargetIds?.length && !state.nightSkips?.WEREWOLF && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
         return { ...commit, currentPhase: 'NIGHT_WEREWOLF' };
       }
-
       const guardian = state.players.find(p => p.role === 'GUARDIAN' && p.alive);
       const guardianTargets = getLivingTargets(state, 'GUARDIAN');
       if (guardian && guardianTargets.length > 0 && !state.guardianTargetId && !state.nightSkips?.GUARDIAN && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
         return { ...commit, currentPhase: 'NIGHT_GUARDIAN' };
       }
-
-      // FITUR BARU: Sheriff tidak bisa menembak di malam 1
+      
+      // FITUR: Sheriff tidak bisa menembak di malam 1
       const sheriff = state.players.find(p => p.role === 'SHERIFF' && p.alive);
       const sheriffTargets = getLivingTargets(state, 'SHERIFF');
       if (sheriff && state.nightNumber > 1 && !state.sheriffResolved && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
@@ -294,7 +155,7 @@ export default function App() {
         return { ...commit, currentPhase: 'NIGHT_SEER' };
       }
 
-      // FITUR BARU: Witch tidak bisa membunuh di malam 1
+      // FITUR: Witch tidak bisa membunuh di malam 1
       const witch = state.players.find(p => p.role === 'WITCH' && p.alive);
       const witchTargets = getLivingTargets(state, 'WITCH');
       const witchCanKill = state.nightNumber > 1; 
@@ -416,10 +277,8 @@ export default function App() {
     if (!validation.valid) { triggerToast(validation.reason); return; }
     const target = gameState.players.find(p => p.id === targetId);
     if (!target) return;
-
     let displayedRole = target.role, isLycanNote = false;
     if (target.role === 'LYCAN') { displayedRole = 'WEREWOLF'; isLycanNote = true; }
-
     setGameState(prev => ({ ...prev, seerTargetId: targetId, seerResult: { targetName: target.name, displayedRole, isLycanNote }, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Seer meramal ${target.name}.`) }));
   };
 
@@ -627,7 +486,6 @@ export default function App() {
     setGameState({ ...createInitialGameState(), players: newPlayers, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
   };
 
-  // FITUR BARU: Export Game Log
   const handleExportGameLog = () => {
     let logText = "=== RIWAYAT PERMAINAN WEREWOLF ===\n\n";
     gameState.gameLog.slice().reverse().forEach(entry => {
@@ -644,9 +502,7 @@ export default function App() {
   const handleBackToHome = () => { localStorage.removeItem(LOCAL_STORAGE_KEY); setGameState(createInitialGameState()); };
   const handleNewGame = () => { localStorage.removeItem(LOCAL_STORAGE_KEY); setGameState(createInitialGameState()); };
 
-  // ==========================================
-  // 4. RENDER SECTIONS (UI)
-  // ==========================================
+  // RENDER SECTIONS
   const formatTime = (totalSec) => `${Math.floor(totalSec / 60).toString().padStart(2, '0')}:${(totalSec % 60).toString().padStart(2, '0')}`;
 
   const renderSmartAssistant = () => {
@@ -1075,6 +931,16 @@ export default function App() {
       <main key={`${gameState.currentPhase}-${gameState.nightNumber}-${gameState.dayNumber}`} className="flex-1 pb-8">
         {renderCurrentPhase()}
       </main>
+
+      {/* FITUR BARU: Quick Action Floating Bar ⚡ */}
+      {gameState.currentPhase !== 'HOME' && gameState.currentPhase !== 'SETUP' && !privacyMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-2 rounded-full shadow-2xl">
+          <button onClick={handleUndo} disabled={!gameState.undoStack || gameState.undoStack.length === 0} className="p-3 rounded-full text-amber-400 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition" title="Undo"><CornerUpLeft className="w-5 h-5" /></button>
+          <button onClick={() => setPrivacyMode(true)} className="p-3 rounded-full text-cyan-400 hover:bg-slate-800 transition" title="Privacy Mode"><EyeOff className="w-5 h-5" /></button>
+          <button onClick={() => setShowGameLogDrawer(true)} className="p-3 rounded-full text-blue-400 hover:bg-slate-800 transition" title="Game Log"><History className="w-5 h-5" /></button>
+          <button onClick={handleBackToHome} className="p-3 rounded-full text-red-400 hover:bg-slate-800 transition" title="Akhiri Permainan"><X className="w-5 h-5" /></button>
+        </div>
+      )}
 
       {privacyMode && (
         <div className="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-6">
