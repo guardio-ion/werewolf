@@ -64,7 +64,12 @@ const GAME_PRESETS = [
 ];
 
 function isWolfAligned(player) {
-  return player?.role === 'WEREWOLF' || player?.role === 'WOLF_CUB';
+  return Boolean(
+    player &&
+    (player.role === 'WEREWOLF' ||
+      player.role === 'WOLF_CUB' ||
+      (player.role === 'TRAITOR' && player.convertedToWerewolf))
+  );
 }
 
 function shuffle(array) {
@@ -92,6 +97,8 @@ function createInitialGameState() {
     guardianTargetId: null,
     sheriffTargetId: null,
     sheriffUsed: false,
+    sheriffSkippedNights: [],
+    sheriffResolved: false,
     doppelgangerTargetId: null,
     doppelgangerCopied: false,
     doppelgangerRoleChangeNotice: null,
@@ -266,7 +273,8 @@ export default function App() {
         return players.filter(p => p.alive && p.id !== sheriff?.id);
       }
       case 'DOPPELGANGER':
-        return players.filter(p => p.alive && p.role !== 'DOPPELGANGER');
+        const doppelganger = players.find(p => p.alive && p.role === 'DOPPELGANGER');
+      return players.filter(p => p.alive && p.id !== doppelganger?.id);
       case 'SEER': {
         const seer = players.find(p => p.role === 'SEER' && p.alive);
         return players.filter(p => p.alive && p.id !== seer?.id);
@@ -417,7 +425,8 @@ export default function App() {
       deathReason: null,
       deathNight: null,
       deathDay: null,
-      hunterRevengeUsed: false
+      hunterRevengeUsed: false,
+       convertedToWerewolf: false
     }));
 
     setGameState(prev => ({
@@ -468,7 +477,7 @@ export default function App() {
 
       const sheriff = state.players.find(p => p.role === 'SHERIFF' && p.alive);
       const sheriffTargets = getLivingTargets(state, 'SHERIFF');
-      if (sheriff && !state.sheriffUsed && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
+      if (sheriff && !state.sheriffResolved && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
         return { ...commit, currentPhase: 'NIGHT_SHERIFF' };
       }
 
@@ -528,7 +537,7 @@ export default function App() {
       const sheriff = updatedPlayers.find(p => p.role === 'SHERIFF' && p.alive);
       const target = updatedPlayers.find(p => p.id === sheriffTarget && p.alive);
       if (sheriff && target) {
-        if (target.role === 'WEREWOLF') {
+        if (target.role === 'WEREWOLF' || target.role === 'WOLF_CUB' || (target.role === 'TRAITOR' && target.convertedToWerewolf)) {
           directDeaths.push({ id: target.id, reason: 'SHERIFF' });
           log = addLog(log, night, day, 'ACTION', `Sheriff berhasil menemukan Werewolf: ${target.name}.`);
         } else {
@@ -602,6 +611,7 @@ export default function App() {
       werewolfTargetIds: [],
       guardianTargetId: null,
       sheriffTargetId: null,
+      sheriffResolved: Boolean(state.sheriffResolved),
       seerTargetId: null,
       seerResult: null,
       witchHealUsedThisNight: false,
@@ -650,7 +660,11 @@ export default function App() {
     const livingWolves = state.players.filter(p => p.alive && isWolfAligned(p));
     const traitors = state.players.filter(p => p.alive && p.role === 'TRAITOR');
     if (livingWolves.length > 0 || traitors.length === 0) return state;
-    const players = state.players.map(p => p.alive && p.role === 'TRAITOR' ? { ...p, role: 'WEREWOLF' } : p);
+    const players = state.players.map(p =>
+      p.alive && p.role === 'TRAITOR'
+        ? { ...p, convertedToWerewolf: true }
+        : p
+    );
     return { ...state, players, gameLog: addLog(state.gameLog, state.nightNumber, state.dayNumber, 'ROLE', `🗡️ Traitor bangkit! ${traitors.map(t => t.name).join(', ')} berubah menjadi Werewolf.`) };
   }
 
@@ -743,16 +757,29 @@ export default function App() {
     const newLog = addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', 'Sheriff menggunakan kemampuan malam pada pemain terpilih.');
     triggerToast('Aksi Sheriff dikonfirmasi.');
     advanceNightPhase(
-      { sheriffUsed: true, gameLog: newLog },
+      { sheriffResolved: true, sheriffUsed: true, gameLog: newLog },
       { recordUndo: true }
     );
   };
 
   const handleSkipSheriff = () => {
-    const newLog = addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'INFO', 'Sheriff memilih SKIP.');
-    triggerToast('Sheriff memilih SKIP.');
+    const night = gameState.nightNumber;
+    const newLog = addLog(
+      gameState.gameLog,
+      night,
+      gameState.dayNumber,
+      'INFO',
+      `Sheriff memilih SKIP pada Malam ${night}. Kemampuan masih tersedia.`
+    );
+    triggerToast('Sheriff memilih SKIP. Kemampuan tetap tersedia untuk malam berikutnya.');
     advanceNightPhase(
-      { sheriffUsed: true, sheriffTargetId: null, gameLog: newLog },
+      {
+        sheriffResolved: false,
+        sheriffUsed: false,
+        sheriffTargetId: null,
+        sheriffSkippedNights: [...(gameState.sheriffSkippedNights || []), night],
+        gameLog: newLog
+      },
       { recordUndo: true }
     );
   };
@@ -1143,7 +1170,8 @@ export default function App() {
         const shuffledRoles = shuffle(roleList);
 
         const newPlayers = playerNames.map((name, idx) => ({
-          id: 'player_' + (idx + 1) + '_' + Date.now(), name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false
+          id: 'player_' + (idx + 1) + '_' + Date.now(), name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false,
+       convertedToWerewolf: false
         }));
 
         setGameState({ ...createInitialGameState(), players: newPlayers, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
@@ -1183,7 +1211,7 @@ export default function App() {
       { key: 'NIGHT_CUPID', label: 'Cupid', active: gameState.nightNumber === 1 && gameState.players.some(p => p.role === 'CUPID' && p.alive) },
       { key: 'NIGHT_WEREWOLF', label: 'Werewolf', active: gameState.players.some(p => isWolfAligned(p) && p.alive) },
       { key: 'NIGHT_GUARDIAN', label: 'Guardian', active: gameState.players.some(p => p.role === 'GUARDIAN' && p.alive) },
-      { key: 'NIGHT_SHERIFF', label: 'Sheriff', active: gameState.players.some(p => p.role === 'SHERIFF' && p.alive) && !gameState.sheriffUsed },
+      { key: 'NIGHT_SHERIFF', label: 'Sheriff', active: gameState.players.some(p => p.role === 'SHERIFF' && p.alive) && !gameState.sheriffResolved },
       { key: 'NIGHT_DOPPELGANGER', label: 'Doppelganger', active: gameState.nightNumber === 1 && gameState.players.some(p => p.role === 'DOPPELGANGER' && p.alive && !gameState.doppelgangerTargetId) },
       { key: 'NIGHT_SEER', label: 'Seer', active: gameState.players.some(p => p.role === 'SEER' && p.alive) },
       { key: 'NIGHT_WITCH', label: 'Witch', active: gameState.players.some(p => p.role === 'WITCH' && p.alive) && (!gameState.witchHealUsed || !gameState.witchKillUsed) }
@@ -2286,7 +2314,7 @@ export default function App() {
             <Award className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-black text-yellow-300">⭐ SHERIFF PHASE</h2>
-          <p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diuji (1x per game).</p>
+          <p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diuji. SKIP tidak menghabiskan kemampuan; Sheriff berhenti hanya setelah mati atau berhasil menembak anggota Evil.</p>
         </div>
 
         <button onClick={handleSkipSheriff} className="w-full py-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-white font-black rounded-2xl text-xs sm:text-sm transition">
