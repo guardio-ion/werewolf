@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Shield,
   Home,
@@ -33,7 +33,8 @@ import {
   Award
 } from 'lucide-react';
 
-const LOCAL_STORAGE_KEY = 'WEREWOLF_MODERATOR_ASSISTANT_STATE_V3';
+const LOCAL_STORAGE_KEY = 'WEREWOLF_MODERATOR_ASSISTANT_STATE_V4';
+const GAME_STATE_VERSION = 4;
 
 const ROLES = {
   WARGA: { name: 'Warga', team: 'Warga', icon: '👨', color: 'text-slate-300', bg: 'bg-slate-900/90', border: 'border-slate-700', accent: 'from-slate-800 to-slate-950', desc: 'Tidak memiliki kemampuan khusus. Bekerja sama mengeliminasi seluruh ancaman.' },
@@ -72,6 +73,49 @@ function isWolfAligned(player) {
   );
 }
 
+function getEffectiveTeam(player) {
+  if (!player) return null;
+  if (player.convertedToWerewolf) return 'Evil';
+  if (player.role === 'WEREWOLF' || player.role === 'WOLF_CUB') return 'Evil';
+  if (player.role === 'JESTER') return 'Neutral';
+  return ROLES[player.role]?.team || 'Warga';
+}
+
+function normalizePlayer(player) {
+  const role = player?.role || 'WARGA';
+  return {
+    ...player,
+    id: String(player?.id || `player_${Date.now()}_${Math.random().toString(36).slice(2)}`),
+    name: String(player?.name || 'Pemain'),
+    role,
+    team: player?.team || getEffectiveTeam({ ...player, role }),
+    alive: player?.alive !== false,
+    loverId: player?.loverId || null,
+    convertedToWerewolf: Boolean(player?.convertedToWerewolf),
+    doppelgangerCopied: Boolean(player?.doppelgangerCopied),
+    protectedLastNight: Boolean(player?.protectedLastNight),
+    protectedThisNight: Boolean(player?.protectedThisNight),
+    hunterRevengeUsed: Boolean(player?.hunterRevengeUsed),
+    deathReason: player?.deathReason || null,
+    deathNight: player?.deathNight ?? null,
+    deathDay: player?.deathDay ?? null
+  };
+}
+
+function loadSavedGame() {
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.players) || typeof parsed.currentPhase !== 'string') return null;
+    if (parsed.stateVersion && parsed.stateVersion !== GAME_STATE_VERSION) return null;
+    return parsed;
+  } catch (error) {
+    console.error('State game tidak dapat dimuat:', error);
+    return null;
+  }
+}
+
 function shuffle(array) {
   const result = [...array];
   for (let i = result.length - 1; i > 0; i--) {
@@ -83,6 +127,7 @@ function shuffle(array) {
 
 function createInitialGameState() {
   return {
+    stateVersion: GAME_STATE_VERSION,
     players: [],
     currentPhase: 'HOME',
     nightNumber: 1,
@@ -150,21 +195,14 @@ const PARTICIPANT_LIST = [
 export default function App() {
   const [gameState, setGameState] = useState(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.currentPhase) {
-          return {
-            ...createInitialGameState(),
-            ...parsed,
-            players: (parsed.players || []).map(p => ({
-              ...p,
-              protectedLastNight: !!p.protectedLastNight,
-              protectedThisNight: !!p.protectedThisNight,
-              doppelgangerCopied: !!p.doppelgangerCopied
-            }))
-          };
-        }
+      const parsed = loadSavedGame();
+      if (parsed) {
+        return {
+          ...createInitialGameState(),
+          ...parsed,
+          stateVersion: GAME_STATE_VERSION,
+          players: parsed.players.map(normalizePlayer)
+        };
       }
     } catch (e) {
       console.error("Gagal memuat state:", e);
@@ -183,6 +221,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [roleCountsDraft, setRoleCountsDraft] = useState({});
   const [privacyMode, setPrivacyMode] = useState(false);
+const discussionTransitionLock = useRef(false);
 
   useEffect(() => {
     if (Object.keys(roleCountsDraft).length === 0 && playerCount > 0) {
@@ -198,7 +237,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...gameState, stateVersion: GAME_STATE_VERSION }));
     } catch (e) {
       console.error("Gagal menyimpan state:", e);
     }
@@ -212,6 +251,10 @@ export default function App() {
   }, [toastMessage]);
 
   const [remainingSeconds, setRemainingSeconds] = useState(300);
+
+useEffect(() => {
+  if (gameState.currentPhase === 'DISCUSSION') discussionTransitionLock.current = false;
+}, [gameState.currentPhase]);
 
   useEffect(() => {
     if (gameState.currentPhase !== 'DISCUSSION') return;
@@ -234,6 +277,8 @@ export default function App() {
   }, [gameState.currentPhase, gameState.discussionEndTimestamp, gameState.isTimerPaused, gameState.pausedRemainingSeconds]);
 
   function triggerAutoTransitionToVoting() {
+    if (discussionTransitionLock.current) return;
+    discussionTransitionLock.current = true;
     setGameState(prev => {
       if (prev.currentPhase !== 'DISCUSSION') return prev;
       const newLog = addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.');
@@ -463,6 +508,12 @@ export default function App() {
         return { ...commit, currentPhase: 'NIGHT_CUPID' };
       }
 
+      const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
+      const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
+      if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
+        return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
+      }
+
       const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
       if (livingWerewolves.length > 0 && wolfTargets.length > 0 && !state.werewolfTargetIds?.length && !state.nightSkips?.WEREWOLF && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
@@ -481,11 +532,7 @@ export default function App() {
         return { ...commit, currentPhase: 'NIGHT_SHERIFF' };
       }
 
-      const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
-      const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
-      if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
-        return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
-      }
+
 
       const seer = state.players.find(p => p.role === 'SEER' && p.alive);
       const seerTargets = getLivingTargets(state, 'SEER');
@@ -603,7 +650,7 @@ export default function App() {
       players: updatedPlayers,
       gameLog: log,
       lastNightDeaths: nightDeathsList,
-      wolfCubRagePending: nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
+      wolfCubRagePending: state.wolfCubRagePending || nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
       hunterPending: nightDeathsList.some(d => d.player.role === 'HUNTER' && !d.player.hunterRevengeUsed),
       loverDeathNotice,
       doppelgangerRoleChangeNotice,
@@ -805,7 +852,7 @@ export default function App() {
       `Werewolf mengunci ${selectedIds.length} target untuk malam ini.`
     );
     advanceNightPhase(
-      { werewolfTargetIds: [...selectedIds], werewolfTargetId: selectedIds[0] || null, gameLog: log },
+      { werewolfTargetIds: [...selectedIds], werewolfTargetId: selectedIds[0] || null, wolfCubRagePending: false, gameLog: log },
       { recordUndo: true }
     );
   };
@@ -1004,7 +1051,7 @@ export default function App() {
     const oldRole = doppel.role;
     const copiedRole = target.role;
     const updatedPlayers = [...players];
-    updatedPlayers[idx] = { ...updatedPlayers[idx], role: copiedRole, doppelgangerCopied: true };
+    updatedPlayers[idx] = { ...updatedPlayers[idx], role: copiedRole, team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' }), doppelgangerCopied: true };
 
     const updatedLog = addLog(log, nightNumber, dayNumber, 'ACTION', `🎭 Doppelganger ${doppel.name} menggantikan role ${target.name} dan menjadi ${ROLES[copiedRole]?.name || copiedRole}.`);
     return { players: updatedPlayers, log: updatedLog, notice: { playerName: doppel.name, targetName: target.name, oldRole, newRole: copiedRole } };
@@ -1177,6 +1224,12 @@ export default function App() {
         setGameState({ ...createInitialGameState(), players: newPlayers, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
       }
     });
+  };
+
+  const clearSavedGame = () => {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    setGameState(createInitialGameState());
+    setToastMessage('Data game tersimpan telah dihapus.');
   };
 
   const handleBackToHome = () => {
@@ -1745,6 +1798,17 @@ export default function App() {
               className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 transition"
             >
               <History className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => setConfirmModalData({
+                title: 'Hapus Data Tersimpan?',
+                message: 'State game yang tersimpan di perangkat ini akan dihapus.',
+                onConfirm: () => { setConfirmModalData(null); clearSavedGame(); }
+              })}
+              className="w-full py-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-400 font-bold text-xs sm:text-sm transition"
+            >
+              HAPUS DATA TERSIMPAN
             </button>
 
             <button
@@ -2587,6 +2651,9 @@ export default function App() {
             setGameState(prev => ({
               ...prev,
               currentPhase: 'DISCUSSION',
+              discussionEndTimestamp: null,
+              isTimerPaused: false,
+              pausedRemainingSeconds: null,
               gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', `Memulai diskusi Hari ${prev.dayNumber}.`)
             }));
           }}
