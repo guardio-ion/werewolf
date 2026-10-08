@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Shield, Home, Lock, Unlock, Crosshair, Moon, Sun, Eye, EyeOff, FlaskConical,
-  Heart, Skull, Users, Flame, RotateCcw, History, BookOpen, X, AlertTriangle,
-  Crown, Play, Pause, HelpCircle, UserCheck, Sparkles, ArrowRight, CornerUpLeft,
-  Info, Check, RefreshCw, Award, StickyNote, User, PawPrint, Swords, Star, 
+  Heart, Skull, Users, History, BookOpen, X,
+  Crown, Play, Pause, HelpCircle, Sparkles, ArrowRight, CornerUpLeft,
+  Check, RefreshCw, StickyNote, User, PawPrint, Swords, Star, 
   MessageSquare, CheckSquare, Masks
 } from 'lucide-react';
 
@@ -36,7 +36,6 @@ export default function App() {
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
   const [showDashboardDrawer, setShowDashboardDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
-  const [confirmModalData, setConfirmModalData] = useState(null);
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [participantSearch, setParticipantSearch] = useState('');
@@ -832,7 +831,6 @@ export default function App() {
     <div className="max-w-xl mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
       <div className="space-y-4 pt-4"><div className={`inline-flex items-center justify-center p-5 rounded-3xl border shadow-2xl ${gameState.winner === 'WARGA' ? 'bg-emerald-950/90 border-emerald-600/60 text-emerald-400' : gameState.winner === 'JESTER' ? 'bg-pink-950/90 border-pink-600/60 text-pink-400' : 'bg-red-950/90 border-red-600/60 text-red-400'}`}><Crown className="w-16 h-16 animate-bounce" /></div><h2 className={`text-3xl font-black uppercase tracking-wider ${gameState.winner === 'WARGA' ? 'text-emerald-400' : gameState.winner === 'JESTER' ? 'text-pink-400' : 'text-red-400'}`}>{gameState.winner === 'WARGA' ? 'TIM WARGA MENANG' : gameState.winner === 'JESTER' ? 'JESTER MENANG' : 'TIM WEREWOLF MENANG'}</h2></div>
       
-      {/* UI Dokumentasi Foto / Ringkasan Akhir */}
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 sm:p-8 shadow-2xl text-left">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Ringkasan Peran Akhir</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -937,7 +935,6 @@ export default function App() {
               <button onClick={() => setShowDashboardDrawer(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"><X className="w-5 h-5" /></button>
             </div>
 
-            {/* Fitur Baru: Papan Catatan Moderator */}
             <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-3xl space-y-3 shadow-inner">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Catatan Pribadi</span>
               <textarea 
