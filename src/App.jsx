@@ -56,6 +56,19 @@ export default function App() {
     localStorage.setItem('werewolf_mod_notes', modNotes);
   }, [modNotes]);
 
+  // Hard-disable browser Text-to-Speech.
+  // The game itself does not use audio, so any queued speech must be cancelled.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [gameState.currentPhase]);
+
   useEffect(() => {
     if (gameState.currentPhase === 'DISCUSSION') discussionTransitionLock.current = false;
   }, [gameState.currentPhase]);
