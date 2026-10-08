@@ -4,7 +4,7 @@ import {
   Heart, Skull, Users, History, BookOpen, X,
   Crown, Play, Pause, HelpCircle, Sparkles, ArrowRight, CornerUpLeft,
   Check, RefreshCw, StickyNote, User, PawPrint, Swords, Star, 
-  MessageSquare, CheckSquare, Theater
+  MessageSquare, CheckSquare, Drama
 } from 'lucide-react';
 
 import { ROLES, ROLE_KEYS } from './constants/roles';
@@ -18,7 +18,7 @@ import {
 const ROLE_ICONS = {
   WARGA: User, WEREWOLF: PawPrint, LYCAN: Moon, SEER: Eye, GUARDIAN: Shield,
   CUPID: Heart, MAYOR: Crown, SHERIFF: Star, HUNTER: Crosshair, TRAITOR: Swords,
-  WOLF_CUB: PawPrint, WITCH: FlaskConical, JESTER: Sparkles, DOPPELGANGER: Theater
+  WOLF_CUB: PawPrint, WITCH: FlaskConical, JESTER: Sparkles, DOPPELGANGER: Drama
 };
 
 export default function App() {
@@ -717,7 +717,7 @@ export default function App() {
 
   const renderNightDoppelganger = () => (
     <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-lg"><Theater className="w-8 h-8" /></div><h2 className="text-2xl font-black text-indigo-300">DOPPELGANGER PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Malam 1: Pilih 1 target hidup.</p></div>
+      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-lg"><Drama className="w-8 h-8" /></div><h2 className="text-2xl font-black text-indigo-300">DOPPELGANGER PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Malam 1: Pilih 1 target hidup.</p></div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
         {gameState.players.filter(p => p.alive && p.role !== 'DOPPELGANGER').map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, doppelgangerTargetId: p.id }))} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left ${gameState.doppelgangerTargetId === p.id ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
       </div>
@@ -965,7 +965,7 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl max-h-[85vh] rounded-3xl flex flex-col shadow-2xl">
             <div className="p-5 border-b border-slate-800 flex items-center justify-between"><div className="flex items-center gap-2 text-amber-400 font-bold text-base"><BookOpen className="w-5 h-5" /><span>Panduan Aturan Werewolf</span></div><button onClick={() => setShowRulesModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"><X className="w-5 h-5" /></button></div>
             <div className="p-5 overflow-y-auto space-y-4 text-sm text-slate-300">
-              <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2"><h4 className="font-bold text-amber-300 text-sm flex items-center gap-2"><Crown className="w-4 h-4" /> Tujuan Permainan</h4><p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil.</p><p>• <strong>Tim Werewolf:</strong> <p>• <strong>Tim Werewolf:</strong> Jumlah role Evil lebih dari atau sama dengan jumlah pemain non-Evil.</p> jumlah pemain non-Evil.</p></section>
+              <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2"><h4 className="font-bold text-amber-300 text-sm flex items-center gap-2"><Crown className="w-4 h-4" /> Tujuan Permainan</h4><p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil.</p><p>• <strong>Tim Werewolf:</strong> Menang jika jumlah Werewolf lebih banyak atau sama dengan dari jumlah pemain non-Evil.</p></section>
               <section className="space-y-2.5"><h4 className="font-bold text-white text-sm">Aturan Peran</h4>{Object.entries(ROLES).map(([key, role]) => { const Icon = ROLE_ICONS[key] || User; return <div key={key} className={`p-3 rounded-2xl border ${role.border} ${role.bg} flex items-start gap-3 shadow-md`}><Icon className={`w-6 h-6 ${role.color} mt-1`} /><div><span className={`font-black ${role.color}`}>{role.name} ({role.team})</span><p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{role.desc}</p></div></div>; })}</section>
             </div>
           </div>
