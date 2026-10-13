@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Shield, Home, Lock, Unlock, Crosshair, Moon, Sun, Eye, EyeOff, FlaskConical,
+  Shield, Home, Lock, Unlock, Crosshair, Moon, Sun, Eye, FlaskConical,
   Heart, Skull, Users, History, BookOpen, X,
   Crown, Play, Pause, HelpCircle, Sparkles, ArrowRight, CornerUpLeft,
-  Check, RefreshCw, StickyNote, User, PawPrint, Swords, Star, 
+  Check, RefreshCw, User, PawPrint, Swords, Star, 
   MessageSquare, CheckSquare, Ghost
 } from 'lucide-react';
 
@@ -31,15 +31,12 @@ export default function App() {
   });
 
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
-  const [showDashboardDrawer, setShowDashboardDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRoleCheckModal, setShowRoleCheckModal] = useState(false); 
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [participantSearch, setParticipantSearch] = useState('');
   const [roleCountsDraft, setRoleCountsDraft] = useState({});
-  const [privacyMode, setPrivacyMode] = useState(false);
-  const [modNotes, setModNotes] = useState(() => localStorage.getItem('werewolf_mod_notes') || '');
   const discussionTransitionLock = useRef(false);
   const [remainingSeconds, setRemainingSeconds] = useState(300);
 
@@ -52,10 +49,6 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...gameState, stateVersion: GAME_STATE_VERSION })); } catch (e) {}
   }, [gameState]);
-
-  useEffect(() => {
-    localStorage.setItem('werewolf_mod_notes', modNotes);
-  }, [modNotes]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -368,21 +361,6 @@ export default function App() {
     const mayor = gameState.players.find(p => p.role === 'MAYOR' && p.alive);
     if (!mayor || gameState.mayorRevealed) return;
     setGameState(prev => ({ ...prev, mayorRevealed: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkap identitas. Suaranya bernilai 2.`) }));
-  };
-
-  const handleVoteSubmit = (voterId, targetId = null) => {
-    if (gameState.currentPhase !== 'VOTING') return;
-    const voter = gameState.players.find(p => p.id === voterId);
-    if (!voter?.alive || Object.prototype.hasOwnProperty.call(gameState.votes, voterId)) return;
-    if (targetId) {
-      const target = gameState.players.find(p => p.id === targetId);
-      if (!target?.alive || target.id === voterId) return;
-    }
-    setGameState(prev => {
-      if (prev.currentPhase !== 'VOTING' || Object.prototype.hasOwnProperty.call(prev.votes, voterId)) return prev;
-      const newVotes = { ...prev.votes, [voterId]: targetId };
-      return { ...prev, undoStack: pushUndoState(prev), votes: newVotes, currentVoterIndex: prev.currentVoterIndex + 1, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', targetId ? `${voter.name} memberikan suara.` : `${voter.name} memilih SKIP VOTE.`) };
-    });
   };
 
   const resetDoppelgangerAbilityState = (state, copiedRole) => {
@@ -1080,14 +1058,12 @@ export default function App() {
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => setShowRoleCheckModal(true)} className="px-3 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 border border-amber-500 text-slate-950 font-black text-xs flex items-center gap-1.5 transition shadow-sm" title="Cek Role Pemain">
-                <Eye className="w-4 h-4" /><span>Cek Role</span>
+              <button onClick={() => setShowRoleCheckModal(true)} className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-amber-400 transition" title="Cek Role Pemain">
+                <Eye className="w-4 h-4" />
               </button>
-              <button onClick={() => setPrivacyMode(prev => !prev)} className={`p-2 rounded-xl border transition ${privacyMode ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800/90 hover:bg-slate-700 border-slate-700/80 text-amber-300'}`} title="Privacy Mode">{privacyMode ? <Unlock className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
               <button onClick={handleBackToHome} className="p-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 transition" title="Kembali ke Home"><Home className="w-4 h-4" /></button>
               {gameState.undoStack && gameState.undoStack.length > 0 && <button onClick={handleUndo} className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-amber-400 transition" title="Undo"><CornerUpLeft className="w-4 h-4" /></button>}
               <button onClick={() => setShowGameLogDrawer(true)} className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 transition" title="Game Log"><History className="w-4 h-4" /></button>
-              <button onClick={() => setShowDashboardDrawer(true)} className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-emerald-400 transition" title="Dashboard & Notes"><StickyNote className="w-4 h-4" /></button>
               <button onClick={() => setShowRulesModal(true)} className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 transition" title="Aturan"><HelpCircle className="w-4 h-4" /></button>
             </div>
           </div>
@@ -1099,16 +1075,6 @@ export default function App() {
       <main key={`${gameState.currentPhase}-${gameState.nightNumber}-${gameState.dayNumber}`} className="flex-1 pb-8">
         {renderCurrentPhase()}
       </main>
-
-      {privacyMode && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-6">
-          <div className="w-full max-w-md text-center space-y-5">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-900 border border-slate-700 text-amber-400 shadow-2xl"><EyeOff className="w-10 h-10" /></div>
-            <div><div className="text-[10px] font-black tracking-[0.25em] text-amber-400 uppercase">PRIVACY MODE</div><h2 className="text-2xl font-black text-white mt-2">INFORMASI RAHASIA TERSEMBUNYI</h2><p className="text-sm text-slate-400 mt-2">Layar aman untuk diperlihatkan kepada pemain.</p></div>
-            <button onClick={() => setPrivacyMode(false)} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-xl">KELUAR PRIVACY MODE</button>
-          </div>
-        </div>
-      )}
 
       {showRoleCheckModal && (
         <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
@@ -1135,34 +1101,6 @@ export default function App() {
             <div className="p-4 border-t border-slate-800 text-center">
               <button onClick={() => setShowRoleCheckModal(false)} className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-lg">TUTUP</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {showDashboardDrawer && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex justify-start animate-fadeIn">
-          <div className="bg-slate-900/95 border-r border-slate-800 w-full max-w-md h-full flex flex-col shadow-2xl p-6 space-y-6 overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h3 className="text-lg font-black text-white flex items-center gap-2"><StickyNote className="w-5 h-5 text-emerald-400" /><span>Dashboard Moderator</span></h3>
-              <button onClick={() => setShowDashboardDrawer(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-3xl space-y-3 shadow-inner">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Catatan Pribadi</span>
-              <textarea 
-                value={modNotes} 
-                onChange={(e) => setModNotes(e.target.value)} 
-                placeholder="Tulis curiga, alibi pemain, atau pola di sini..."
-                className="w-full h-48 bg-slate-900 border border-slate-800 rounded-2xl p-3 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 resize-none"
-              ></textarea>
-              <p className="text-[10px] text-slate-500">Catatan tersimpan otomatis di perangkat ini.</p>
-            </div>
-
-            <div className="bg-slate-950/90 border border-slate-800 p-5 rounded-3xl space-y-2 text-xs text-slate-300 shadow-inner">
-              <div className="flex justify-between"><span className="text-slate-500 font-medium">Status Sesi:</span><span className="font-black text-white">Malam {gameState.nightNumber} / Hari {gameState.dayNumber}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500 font-medium">Pemain Hidup / Mati:</span><span className="font-black text-white">{gameState.players.filter(p => p.alive).length} Hidup · {gameState.players.filter(p => !p.alive).length} Mati</span></div>
-            </div>
-
           </div>
         </div>
       )}
