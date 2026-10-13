@@ -14,6 +14,7 @@ import {
   isWolfAligned, getEffectiveTeam, normalizePlayer, loadSavedGame, 
   shuffle, createInitialGameState, addLog, pushUndoState 
 } from './utils/gameLogic';
+import { CinematicStyles, CinematicBackdrop, PhaseTitleCard, sceneForPhase } from './components/Cinematic';
 
 const ROLE_ICONS = {
   WARGA: User, WEREWOLF: PawPrint, LYCAN: Moon, SEER: Eye, GUARDIAN: Shield,
@@ -600,10 +601,10 @@ export default function App() {
     <div className="min-h-[85vh] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
       <div className="max-w-md w-full space-y-8">
         <div className="space-y-4">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl wf-glow">
             <Moon className="w-12 h-12 text-red-400" />
           </div>
-          <h1 className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase">WEREWOLF</h1>
+          <h1 className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase wf-shimmer">WEREWOLF</h1>
           <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Moderator Game Assistant</p>
           <p className="text-xs sm:text-sm text-slate-300 px-4">Panduan lengkap untuk menjalankan permainan Werewolf secara otomatis dan terstruktur.</p>
         </div>
@@ -759,7 +760,7 @@ export default function App() {
               <h3 className="text-base font-bold text-white mb-1">ROLE RAHASIA</h3><p className="text-xs text-slate-400">Ketuk untuk membuka kartu role.</p>
             </div>
           ) : (
-            <div className={`w-full max-w-xs rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl space-y-6 animate-fadeIn`}>
+            <div className={`w-full max-w-xs rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl space-y-6 wf-flip`}>
               <div className="space-y-3"><Icon className={`w-16 h-16 mx-auto ${roleMeta.color}`} /><h3 className={`text-2xl font-black uppercase tracking-wider ${roleMeta.color}`}>{roleMeta.name}</h3><span className="inline-block px-3 py-1 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-200">Tim {roleMeta.team}</span></div>
               <p className="text-xs text-slate-200 leading-relaxed bg-black/40 p-3.5 rounded-2xl border border-white/10">{roleMeta.desc}</p>
               <button onClick={() => setGameState(prev => ({ ...prev, isRoleCardOpen: false }))} className="px-4 py-2 rounded-xl bg-black/50 hover:bg-black/70 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition"><Unlock className="w-3.5 h-3.5" /><span>Sembunyikan Role</span></button>
@@ -955,7 +956,7 @@ export default function App() {
         {(gameState.lastNightDeaths || []).length === 0 ? (
           <div className="space-y-2"><Sun className="w-10 h-10 text-emerald-400 mx-auto" /><h3 className="text-xl font-black text-emerald-400">Semua Pemain Selamat!</h3><p className="text-xs text-slate-300">Semalam tidak ada pemain yang tereliminasi.</p></div>
         ) : (
-          <div className="space-y-3"><Skull className="w-10 h-10 text-red-400 mx-auto" /><h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3><div className="space-y-2">{(gameState.lastNightDeaths || []).map(({ player, reason }) => <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between"><span className="font-black text-white text-sm">{player.name}</span><span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">{DEATH_REASON_LABELS[reason] || reason}</span></div>)}</div></div>
+          <div className="space-y-3"><Skull className="w-10 h-10 text-red-400 mx-auto" /><h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3><div className="space-y-2 wf-stagger">{(gameState.lastNightDeaths || []).map(({ player, reason }) => <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between"><span className="font-black text-white text-sm">{player.name}</span><span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">{DEATH_REASON_LABELS[reason] || reason}</span></div>)}</div></div>
         )}
       </div>
       <button onClick={() => setGameState(prev => ({ ...prev, currentPhase: 'DISCUSSION', discussionEndTimestamp: null, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', `Memulai diskusi Hari ${prev.dayNumber}.`) }))} className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT KE WAKTU DISKUSI</span><ArrowRight className="w-5 h-5" /></button>
@@ -1175,9 +1176,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-900/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-950/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
+    <div data-scene={sceneForPhase(gameState.currentPhase, gameState.winner)} className="wf-app min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
+      <CinematicStyles />
+      <CinematicBackdrop />
+      <PhaseTitleCard phase={gameState.currentPhase} night={gameState.nightNumber} day={gameState.dayNumber} winner={gameState.winner} />
 
       {gameState.loverDeathNotice && gameState.loverDeathNotice.length > 0 && (
         <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
