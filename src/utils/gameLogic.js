@@ -1,7 +1,7 @@
 export const LOCAL_STORAGE_KEY =
-  'WEREWOLF_MODERATOR_ASSISTANT_STATE_V4';
+  'WEREWOLF_MODERATOR_ASSISTANT_STATE_V5';
 
-export const GAME_STATE_VERSION = 4;
+export const GAME_STATE_VERSION = 5;
 
 export function isWolfAligned(player) {
   return Boolean(
@@ -217,47 +217,49 @@ export function createInitialGameState() {
     stateVersion: GAME_STATE_VERSION,
     players: [],
     currentPhase: 'HOME',
+    resumePhase: null,
     nightNumber: 1,
     dayNumber: 1,
+
+    // Timer diskusi
     discussionEndTimestamp: null,
     discussionDurationSeconds: 300,
     isTimerPaused: false,
     pausedRemainingSeconds: null,
+
+    // Aksi malam (dikunci per pemain pelaku agar role ganda didukung)
+    nightActs: {},
+    nightActorId: null,
+    draft: {},
+    nightSkips: {},
     werewolfTargetId: null,
     werewolfTargetIds: [],
     wolfCubRagePending: false,
-    guardianTargetId: null,
-    sheriffTargetId: null,
-    sheriffUsed: false,
-    sheriffSkippedNights: [],
-    sheriffResolved: false,
-    doppelgangerTargetId: null,
-    doppelgangerCopied: false,
-    doppelgangerRoleChangeNotice: null,
-    doppelgangerRevealNextPhase: null,
-    doppelgangerRevealWinner: null,
-    mayorRevealed: false,
-    seerTargetId: null,
+    guardianLast: {},
     seerResult: null,
-    witchHealUsedThisNight: false,
-    witchHealTargetId: null,
-    witchKillTargetId: null,
+    abilityUsed: {},
+    doppelgangerTargets: {},
+
+    // Hunter / Doppelganger / Lovers
     hunterTargetId: null,
     hunterPending: false,
-    cupidLover1Id: null,
-    cupidLover2Id: null,
-    witchHealUsed: false,
-    witchKillUsed: false,
-    cupidUsed: false,
-    nightSkips: {},
+    hunterSource: null,
+    doppelgangerNotices: [],
+    doppelgangerRevealNextPhase: null,
+    loverDeathNotice: [],
+
+    // Voting
+    voteTally: {},
+    voteRecorded: false,
+    mayorRevealedIds: [],
+    mayorVotes: {},
     currentVoterIndex: 0,
-    votes: {},
+
     revealPlayerIndex: 0,
     isRoleCardOpen: false,
     gameLog: [],
     lastNightDeaths: [],
     lastDayDeaths: [],
-    loverDeathNotice: [],
     roleCounts: {},
     winner: null,
     undoStack: []
