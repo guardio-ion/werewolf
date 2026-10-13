@@ -33,7 +33,7 @@ export default function App() {
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
   const [showDashboardDrawer, setShowDashboardDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
-  const [showRoleCheckModal, setShowRoleCheckModal] = useState(false); // Modal cek role untuk moderator
+  const [showRoleCheckModal, setShowRoleCheckModal] = useState(false); 
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [participantSearch, setParticipantSearch] = useState('');
@@ -115,26 +115,22 @@ export default function App() {
     return { valid: true };
   };
 
-  // Perbaikan urutan dan fleksibilitas transisi fase malam agar role kompleks tidak saling menimpa/hilang
   const advanceNightPhase = (overrides = {}, options = {}) => {
     setGameState(prev => {
       if (prev.currentPhase === 'GAME_OVER') return prev;
       const state = { ...prev, ...overrides };
       const commit = options.recordUndo ? { ...state, undoStack: pushUndoState(prev) } : state;
 
-      // 1. Cupid (Malam 1)
       if (state.nightNumber === 1 && state.players.some(p => p.role === 'CUPID' && p.alive) && !state.cupidUsed && !state.nightSkips?.CUPID && !state.cupidResolved) {
         return { ...commit, currentPhase: 'NIGHT_CUPID' };
       }
 
-      // 2. Doppelganger (Malam 1)
       const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
       const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
       if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0) {
         return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
       }
 
-      // 3. Werewolf
       const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
       const requiredWolfTargets = state.wolfCubRagePending ? 2 : 1;
@@ -143,28 +139,24 @@ export default function App() {
         return { ...commit, currentPhase: 'NIGHT_WEREWOLF' };
       }
 
-      // 4. Guardian
       const guardian = state.players.find(p => p.role === 'GUARDIAN' && p.alive);
       const guardianTargets = getLivingTargets(state, 'GUARDIAN');
       if (guardian && guardianTargets.length > 0 && !state.guardianTargetId && !state.nightSkips?.GUARDIAN) {
         return { ...commit, currentPhase: 'NIGHT_GUARDIAN' };
       }
 
-      // 5. Sheriff (Malam > 1)
       const sheriff = state.players.find(p => p.role === 'SHERIFF' && p.alive);
       const sheriffTargets = getLivingTargets(state, 'SHERIFF');
       if (sheriff && state.nightNumber > 1 && !state.sheriffResolved && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0) {
         return { ...commit, currentPhase: 'NIGHT_SHERIFF' };
       }
 
-      // 6. Seer
       const seer = state.players.find(p => p.role === 'SEER' && p.alive);
       const seerTargets = getLivingTargets(state, 'SEER');
       if (seer && seerTargets.length > 0 && !state.seerTargetId && !state.nightSkips?.SEER) {
         return { ...commit, currentPhase: 'NIGHT_SEER' };
       }
 
-      // 7. Witch
       const witch = state.players.find(p => p.role === 'WITCH' && p.alive);
       const witchTargets = getLivingTargets(state, 'WITCH');
       const witchCanKill = state.nightNumber > 1; 
@@ -172,7 +164,6 @@ export default function App() {
         return { ...commit, currentPhase: 'NIGHT_WITCH' };
       }
 
-      // Jika semua aksi malam selesai, eksekusi malam
       return resolveNightActions(commit);
     });
   };
@@ -223,7 +214,7 @@ export default function App() {
         if (partner && partner.alive && !newDeathsMap.has(partnerId)) {
           newDeathsMap.set(partnerId, 'LOVER');
           loverDeathNotice.push({ id: `lover_${partner.id}_${night}_${day}`, name: partner.name, partnerName: deadPlayer.name });
-          log = addLog(log, night, day, 'DEATH', `${partner.name} ikut tereliminasi karena pasangan ${deadPlayer.name} tereliminasi.`);
+          log = addLog(log, night, day, 'DEATH', `💔 PENGUMUMAN LOVERS: ${partner.name} ikut tereliminasi serentak karena pasangan ${deadPlayer.name} tereliminasi.`);
           changed = true;
         }
       }
@@ -269,8 +260,16 @@ export default function App() {
     const livingWolves = state.players.filter(p => p.alive && isWolfAligned(p));
     const traitors = state.players.filter(p => p.alive && p.role === 'TRAITOR');
     if (livingWolves.length > 0 || traitors.length === 0) return state;
+    
     const players = state.players.map(p => p.alive && p.role === 'TRAITOR' ? { ...p, convertedToWerewolf: true } : p);
-    return { ...state, players, gameLog: addLog(state.gameLog, state.nightNumber, state.dayNumber, 'ROLE', `Traitor bangkit! ${traitors.map(t => t.name).join(', ')} berubah menjadi Werewolf.`) };
+    const traitorNames = traitors.map(t => t.name).join(', ');
+    const reminderMsg = `⚠️ PENGINGAT MODERATOR: Seluruh Werewolf asli telah mati! Traitor (${traitorNames}) resmi berubah menjadi Werewolf dan masuk ke tim Evil!`;
+    
+    return { 
+      ...state, 
+      players, 
+      gameLog: addLog(state.gameLog, state.nightNumber, state.dayNumber, 'ROLE', reminderMsg) 
+    };
   }
 
   function checkWinConditions(state) {
@@ -289,6 +288,7 @@ export default function App() {
     if (!target) return;
     let displayedRole = target.role, isLycanNote = false;
     if (target.role === 'LYCAN') { displayedRole = 'WEREWOLF'; isLycanNote = true; }
+    else if (target.role === 'JESTER') { displayedRole = 'WARGA'; }
     setGameState(prev => ({ ...prev, seerTargetId: targetId, seerResult: { targetName: target.name, displayedRole, isLycanNote }, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Seer meramal ${target.name}.`) }));
   };
 
@@ -403,10 +403,24 @@ export default function App() {
     if (!target || target.alive) return { players, log, notice: null };
     const idx = players.findIndex(p => p.id === doppel.id);
     if (idx === -1) return { players, log, notice: null };
+    
     const copiedRole = target.role;
     const updatedPlayers = [...players];
-    updatedPlayers[idx] = { ...updatedPlayers[idx], role: copiedRole, team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' }), doppelgangerCopied: true };
-    return { players: updatedPlayers, log: addLog(log, nightNumber, dayNumber, 'ACTION', `Doppelganger ${doppel.name} menggantikan role ${target.name} dan menjadi ${ROLES[copiedRole]?.name}.`), notice: { playerName: doppel.name, targetName: target.name, oldRole: doppel.role, newRole: copiedRole } };
+    updatedPlayers[idx] = { 
+      ...updatedPlayers[idx], 
+      role: copiedRole, 
+      team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' }), 
+      doppelgangerCopied: true 
+    };
+
+    const reminderMsg = `⚠️ PENGINGAT MODERATOR: Target Doppelganger (${target.name}) telah mati. Doppelganger (${doppel.name}) resmi mewarisi role ${ROLES[copiedRole]?.name}!`;
+    const updatedLog = addLog(log, nightNumber, dayNumber, 'ACTION', reminderMsg);
+
+    return { 
+      players: updatedPlayers, 
+      log: updatedLog, 
+      notice: { playerName: doppel.name, targetName: target.name, oldRole: doppel.role, newRole: copiedRole } 
+    };
   };
 
   const resolveVotingResults = () => {
@@ -435,6 +449,7 @@ export default function App() {
       const eliminatedId = topCandidates[0];
       const eliminatedPlayer = updatedPlayers.find(p => p.id === eliminatedId);
       log = addLog(log, nightNumber, dayNumber, 'ACTION', `${eliminatedPlayer.name} tereliminasi (${maxVotes} suara).`);
+      
       let newDeathsMap = new Map();
       newDeathsMap.set(eliminatedId, 'VOTE');
       let resolved = false;
@@ -447,11 +462,13 @@ export default function App() {
             if (partner && partner.alive && !newDeathsMap.has(partner.id)) {
               newDeathsMap.set(partner.id, 'LOVER');
               loverDeathNotice.push({ id: `lover_${partner.id}_${nightNumber}_${dayNumber}`, name: partner.name, partnerName: deadPlayer.name });
+              log = addLog(log, nightNumber, dayNumber, 'DEATH', `💔 PENGUMUMAN LOVERS: ${partner.name} ikut tereliminasi serentak karena pasangan ${deadPlayer.name} tereliminasi.`);
               resolved = false;
             }
           }
         });
       }
+
       newDeathsMap.forEach((reason, deadId) => {
         const idx = updatedPlayers.findIndex(p => p.id === deadId);
         if (idx !== -1) { updatedPlayers[idx].alive = false; updatedPlayers[idx].deathReason = reason; updatedPlayers[idx].deathDay = dayNumber; dayDeaths.push({ player: updatedPlayers[idx], reason }); }
@@ -843,9 +860,7 @@ export default function App() {
     </div>
   );
 
-  // Handler untuk menyimpan rekap voting langsung (misal: A dapat 3 suara, B dapat 2 suara)
   const handleBatchVoteSubmit = (tallyInput) => {
-    // tallyInput berupa object: { [targetId]: jumlahSuara }
     let simulatedVotes = {};
     let voterIndex = 0;
     const livingPlayers = gameState.players.filter(p => p.alive);
@@ -860,7 +875,6 @@ export default function App() {
       }
     });
 
-    // Sisa pemain yang belum divoting dianggap skip vote
     while (voterIndex < livingPlayers.length) {
       simulatedVotes[livingPlayers[voterIndex].id] = null;
       voterIndex++;
@@ -879,7 +893,6 @@ export default function App() {
     const livingPlayers = gameState.players.filter(p => p.alive);
     const hasVotesRecorded = Object.keys(gameState.votes || {}).length > 0;
     
-    // State lokal sementara untuk menampung input jumlah suara per kandidat
     const [batchTally, setBatchTally] = useState(() => {
       const initial = {};
       livingPlayers.forEach(p => { initial[p.id] = ''; });
@@ -1052,7 +1065,7 @@ export default function App() {
         <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
           <div className="w-full max-w-md bg-slate-900 border-2 border-pink-600/80 rounded-3xl p-6 shadow-2xl space-y-5">
             <div className="text-center space-y-2"><Heart className="w-10 h-10 text-pink-400 fill-current mx-auto" /><h3 className="text-2xl font-black text-pink-400">COUPLE TERPUTUS</h3></div>
-            <div className="space-y-2">{gameState.loverDeathNotice.map(notice => <div key={notice.id} className="p-4 rounded-2xl bg-pink-950/60 border border-pink-800/80 text-center"><p className="text-base font-black text-white">{notice.name}</p><p className="text-xs text-pink-300 mt-1">ikut meninggal karena <strong>{notice.partnerName}</strong> mati.</p></div>)}</div>
+            <div className="space-y-2">{gameState.loverDeathNotice.map(notice => <div key={notice.id} className="p-4 rounded-2xl bg-pink-950/60 border border-pink-800/80 text-center"><p className="text-base font-black text-white">{notice.name}</p><p className="text-xs text-pink-300 mt-1">ikut meninggal serentak karena <strong>{notice.partnerName}</strong> mati.</p></div>)}</div>
             <button onClick={() => setGameState(prev => ({ ...prev, loverDeathNotice: [] }))} className="w-full py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-black transition shadow-lg">MENGERTI</button>
           </div>
         </div>
@@ -1067,7 +1080,6 @@ export default function App() {
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              {/* Tombol Moderator Cek Role di Bagian Atas */}
               <button onClick={() => setShowRoleCheckModal(true)} className="px-3 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 border border-amber-500 text-slate-950 font-black text-xs flex items-center gap-1.5 transition shadow-sm" title="Cek Role Pemain">
                 <Eye className="w-4 h-4" /><span>Cek Role</span>
               </button>
@@ -1098,7 +1110,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal Cek Role Khusus Moderator */}
       {showRoleCheckModal && (
         <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-lg max-h-[80vh] rounded-3xl flex flex-col shadow-2xl">
