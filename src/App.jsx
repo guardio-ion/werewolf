@@ -843,34 +843,147 @@ export default function App() {
     </div>
   );
 
+  // Handler untuk menyimpan rekap voting langsung (misal: A dapat 3 suara, B dapat 2 suara)
+  const handleBatchVoteSubmit = (tallyInput) => {
+    // tallyInput berupa object: { [targetId]: jumlahSuara }
+    let simulatedVotes = {};
+    let voterIndex = 0;
+    const livingPlayers = gameState.players.filter(p => p.alive);
+
+    Object.entries(tallyInput).forEach(([targetId, count]) => {
+      const num = parseInt(count, 10) || 0;
+      for (let i = 0; i < num; i++) {
+        if (voterIndex < livingPlayers.length) {
+          simulatedVotes[livingPlayers[voterIndex].id] = targetId;
+          voterIndex++;
+        }
+      }
+    });
+
+    // Sisa pemain yang belum divoting dianggap skip vote
+    while (voterIndex < livingPlayers.length) {
+      simulatedVotes[livingPlayers[voterIndex].id] = null;
+      voterIndex++;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      undoStack: pushUndoState(prev),
+      votes: simulatedVotes,
+      currentVoterIndex: livingPlayers.length,
+      gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', 'Moderator memasukkan rekapitulasi hasil voting secara langsung.')
+    }));
+  };
+
   const renderVoting = () => {
     const livingPlayers = gameState.players.filter(p => p.alive);
-    const { currentVoterIndex, votes } = gameState;
-    const currentVoter = livingPlayers[currentVoterIndex];
-    const isAllVotesDone = currentVoterIndex >= livingPlayers.length || Object.keys(votes).length >= livingPlayers.length;
+    const hasVotesRecorded = Object.keys(gameState.votes || {}).length > 0;
+    
+    // State lokal sementara untuk menampung input jumlah suara per kandidat
+    const [batchTally, setBatchTally] = useState(() => {
+      const initial = {};
+      livingPlayers.forEach(p => { initial[p.id] = ''; });
+      return initial;
+    });
+
     const voteTally = {};
-    Object.entries(votes).forEach(([voterId, targetId]) => { const voter = gameState.players.find(p => p.id === voterId && p.alive); if (!voter || !targetId) return; const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1; voteTally[targetId] = (voteTally[targetId] || 0) + weight; });
-    const sortedCandidates = Object.entries(voteTally).map(([targetId, count]) => ({ player: gameState.players.find(p => p.id === targetId), count })).filter(item => item.player).sort((a, b) => b.count - a.count);
+    Object.entries(gameState.votes || {}).forEach(([voterId, targetId]) => { 
+      const voter = gameState.players.find(p => p.id === voterId && p.alive); 
+      if (!voter || !targetId) return; 
+      const weight = voter.role === 'MAYOR' && gameState.mayorRevealed ? 2 : 1; 
+      voteTally[targetId] = (voteTally[targetId] || 0) + weight; 
+    });
+
+    const sortedCandidates = Object.entries(voteTally)
+      .map(([targetId, count]) => ({ player: gameState.players.find(p => p.id === targetId), count }))
+      .filter(item => item.player)
+      .sort((a, b) => b.count - a.count);
+
     const maxVotes = sortedCandidates.length > 0 ? sortedCandidates[0].count : 0;
+
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg"><CheckSquare className="w-8 h-8" /></div><h2 className="text-2xl font-black text-white">SESI VOTING</h2></div>
-        {gameState.players.some(p => p.role === 'MAYOR' && p.alive) && !gameState.mayorRevealed && <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm shadow-md transition flex items-center justify-center gap-2"><Crown className="w-4 h-4" /> UNGKAP IDENTITAS MAYOR</button>}
-        {!isAllVotesDone && currentVoter ? (
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg">
+            <CheckSquare className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-black text-white">SESI REKAP VOTING</h2>
+          <p className="text-xs text-slate-400">Masukkan jumlah perolehan suara secara langsung untuk masing-masing pemain.</p>
+        </div>
+
+        {gameState.players.some(p => p.role === 'MAYOR' && p.alive) && !gameState.mayorRevealed && (
+          <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm shadow-md transition flex items-center justify-center gap-2">
+            <Crown className="w-4 h-4" /> UNGKAP IDENTITAS MAYOR
+          </button>
+        )}
+
+        {!hasVotesRecorded ? (
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PEMILIH ({currentVoterIndex + 1}/{livingPlayers.length})</span><span className="text-lg font-black text-amber-400">{currentVoter.name}</span></div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[35vh] overflow-y-auto">
-              {livingPlayers.filter(p => p.id !== currentVoter.id).map(target => <button key={target.id} onClick={() => handleVoteSubmit(currentVoter.id, target.id)} className="p-3.5 rounded-2xl border bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-red-950/80 text-xs sm:text-sm font-bold text-left transition flex items-center justify-between"><span className="truncate">{target.name}</span><Skull className="w-4 h-4 text-red-400 shrink-0" /></button>)}
+            <div className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Input Perolehan Suara Kandidat:</div>
+            <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+              {livingPlayers.map(target => (
+                <div key={target.id} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <span className="text-sm font-bold text-white truncate">{target.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase">Suara:</span>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      max={livingPlayers.length}
+                      value={batchTally[target.id] || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setBatchTally(prev => ({ ...prev, [target.id]: val }));
+                      }}
+                      placeholder="0"
+                      className="w-16 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-center text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-            <button onClick={() => handleVoteSubmit(currentVoter.id, null)} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition">SKIP VOTE</button>
+            <button 
+              onClick={() => handleBatchVoteSubmit(batchTally)} 
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 text-white font-black text-sm shadow-xl transition mt-4"
+            >
+              SIMPAN & REKAP SUARA
+            </button>
           </div>
         ) : (
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-6 space-y-5 shadow-2xl">
-            <h3 className="text-base font-bold text-white text-center">HASIL REKAP VOTING</h3>
-            <div className="space-y-3">
-              {sortedCandidates.length === 0 ? <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">Semua pemain memilih skip vote. Tidak ada eliminasi.</div> : sortedCandidates.map(({ player, count }) => { const isTop = count === maxVotes && maxVotes > 0; const percentage = Math.min(100, (count / livingPlayers.length) * 100); return <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500/80' : 'bg-slate-950/80 border-slate-800/80'}`}><div className="flex justify-between items-center text-sm font-bold"><span className={isTop ? 'text-red-400' : 'text-white'}>{player.name}</span><span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isTop ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{count} Suara</span></div><div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden"><div className={`h-full rounded-full ${isTop ? 'bg-gradient-to-r from-red-600 to-amber-500' : 'bg-slate-600'}`} style={{ width: `${Math.max(8, percentage)}%` }} /></div></div>; })}
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-white">HASIL REKAP VOTING</h3>
+              <button 
+                onClick={() => setGameState(prev => ({ ...prev, votes: {}, currentVoterIndex: 0 }))} 
+                className="text-xs text-amber-400 hover:underline font-semibold"
+              >
+                Ubah Suara
+              </button>
             </div>
-            <button onClick={resolveVotingResults} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>PROSES HASIL VOTING</span><ArrowRight className="w-5 h-5" /></button>
+            <div className="space-y-3">
+              {sortedCandidates.length === 0 ? (
+                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">Tidak ada suara tercatat. Semua pemain skip.</div>
+              ) : (
+                sortedCandidates.map(({ player, count }) => { 
+                  const isTop = count === maxVotes && maxVotes > 0; 
+                  const percentage = Math.min(100, (count / livingPlayers.length) * 100); 
+                  return (
+                    <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500/80' : 'bg-slate-950/80 border-slate-800/80'}`}>
+                      <div className="flex justify-between items-center text-sm font-bold">
+                        <span className={isTop ? 'text-red-400' : 'text-white'}>{player.name}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isTop ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{count} Suara</span>
+                      </div>
+                      <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${isTop ? 'bg-gradient-to-r from-red-600 to-amber-500' : 'bg-slate-600'}`} style={{ width: `${Math.max(8, percentage)}%` }} />
+                      </div>
+                    </div>
+                  ); 
+                })
+              )}
+            </div>
+            <button onClick={resolveVotingResults} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition">
+              <span>PROSES HASIL VOTING</span><ArrowRight className="w-5 h-5" />
+            </button>
           </div>
         )}
       </div>
