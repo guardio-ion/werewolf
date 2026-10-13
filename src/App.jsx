@@ -25,8 +25,6 @@ const DEATH_REASON_LABELS = {
   WEREWOLF: 'Diserang Werewolf', WITCH: 'Racun Witch', SHERIFF: 'Ditembak Sheriff',
   SHERIFF_MISS: 'Sheriff salah tembak', LOVER: 'Ikut pasangan', HUNTER: 'Dibalas Hunter', VOTE: 'Hasil voting'
 };
-// Role yang logikanya hanya mendukung 1 pemain per game (logika memakai .find())
-const SINGLE_ROLES = ['SEER', 'GUARDIAN', 'WITCH', 'SHERIFF', 'CUPID', 'DOPPELGANGER', 'HUNTER', 'MAYOR'];
 
 
 export default function App() {
@@ -98,29 +96,38 @@ export default function App() {
     discussionTransitionLock.current = true;
     setGameState(prev => {
       if (prev.currentPhase !== 'DISCUSSION') return prev;
-      return { ...prev, currentPhase: 'VOTING', currentVoterIndex: 0, voteTally: {}, voteRecorded: false, mayorVoteTargetId: null, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.') };
+      return { ...prev, currentPhase: 'VOTING', currentVoterIndex: 0, voteTally: {}, voteRecorded: false, mayorVotes: {}, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.') };
     });
   }
 
-  const getLivingTargets = (state, kind) => {
+  // ---------- helper aksi malam per-aktor (mendukung role ganda) ----------
+  const aliveOf = (state, role) => (state.players || []).filter(p => p.alive && p.role === role);
+  const getActs = (state, role) => (state.nightActs || {})[role] || {};
+  const isUsed = (state, actorId, key) => !!((state.abilityUsed || {})[actorId] || {})[key];
+  const markUsed = (state, actorId, key) => ({ ...(state.abilityUsed || {}), [actorId]: { ...((state.abilityUsed || {})[actorId] || {}), [key]: true } });
+  const withAct = (state, role, actorId, payload) => ({ ...(state.nightActs || {}), [role]: { ...getActs(state, role), [actorId]: payload } });
+  const getActor = (state) => (state.players || []).find(p => p.id === state.nightActorId);
+
+  const getLivingTargets = (state, kind, actorId) => {
     const players = state.players || [];
     switch (kind) {
       case 'WEREWOLF': return players.filter(p => p.alive && !isWolfAligned(p));
-      case 'GUARDIAN': return players.filter(p => p.alive && !p.protectedLastNight);
-      case 'SHERIFF': { const sheriff = players.find(p => p.role === 'SHERIFF' && p.alive); return players.filter(p => p.alive && p.id !== sheriff?.id); }
-      case 'DOPPELGANGER': { const dg = players.find(p => p.alive && p.role === 'DOPPELGANGER'); return players.filter(p => p.alive && p.id !== dg?.id); }
-      case 'SEER': { const seer = players.find(p => p.role === 'SEER' && p.alive); return players.filter(p => p.alive && p.id !== seer?.id); }
-      case 'HUNTER': return players.filter(p => p.alive);
+      case 'GUARDIAN': return players.filter(p => p.alive && (state.guardianLast || {})[actorId] !== p.id);
+      case 'CUPID': return players.filter(p => p.alive && !p.loverId);
+      case 'SHERIFF':
+      case 'DOPPELGANGER':
+      case 'SEER': return players.filter(p => p.alive && p.id !== actorId);
+      case 'HUNTER':
       case 'WITCH':
       default: return players.filter(p => p.alive);
     }
   };
 
-  const validateTarget = (state, kind, targetId) => {
+  const validateTarget = (state, kind, targetId, actorId) => {
     if (!targetId) return { valid: false };
     const target = state.players.find(p => p.id === targetId);
     if (!target || !target.alive) return { valid: false };
-    if (!getLivingTargets(state, kind).some(p => p.id === targetId)) return { valid: false };
+    if (!getLivingTargets(state, kind, actorId).some(p => p.id === targetId)) return { valid: false };
     return { valid: true };
   };
 
@@ -129,49 +136,34 @@ export default function App() {
       if (prev.currentPhase === 'GAME_OVER') return prev;
       const state = { ...prev, ...overrides };
       const commit = options.recordUndo ? { ...state, undoStack: pushUndoState(prev) } : state;
+      const route = (phase, actor) => ({ ...commit, currentPhase: phase, nightActorId: actor ? actor.id : null });
 
-      if (state.nightNumber === 1 && state.players.some(p => p.role === 'CUPID' && p.alive) && !state.cupidUsed && !state.nightSkips?.CUPID && !state.cupidResolved) {
-        return { ...commit, currentPhase: 'NIGHT_CUPID' };
-      }
+      // Cupid: malam 1, atau Doppelganger yang sudah menyalin Cupid (sekali per aktor)
+      const cupid = aliveOf(state, 'CUPID').find(p => !getActs(state, 'CUPID')[p.id] && !isUsed(state, p.id, 'CUPID') && (state.nightNumber === 1 || p.doppelgangerCopied) && getLivingTargets(state, 'CUPID', p.id).length >= 2);
+      if (cupid) return route('NIGHT_CUPID', cupid);
 
-      const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
-      const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
-      if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0) {
-        return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
-      }
+      const doppel = aliveOf(state, 'DOPPELGANGER').find(p => !p.doppelgangerCopied && state.nightNumber === 1 && !(p.id in (state.doppelgangerTargets || {})) && getLivingTargets(state, 'DOPPELGANGER', p.id).length > 0);
+      if (doppel) return route('NIGHT_DOPPELGANGER', doppel);
 
       const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
       const requiredWolfTargets = Math.min(state.wolfCubRagePending ? 2 : 1, wolfTargets.length);
       const currentWolfCount = (state.werewolfTargetIds || []).length || (state.werewolfTargetId ? 1 : 0);
       if (livingWerewolves.length > 0 && wolfTargets.length > 0 && currentWolfCount < requiredWolfTargets && !state.nightSkips?.WEREWOLF) {
-        return { ...commit, currentPhase: 'NIGHT_WEREWOLF' };
+        return route('NIGHT_WEREWOLF', null);
       }
 
-      const guardian = state.players.find(p => p.role === 'GUARDIAN' && p.alive);
-      const guardianTargets = getLivingTargets(state, 'GUARDIAN');
-      if (guardian && guardianTargets.length > 0 && !state.guardianTargetId && !state.nightSkips?.GUARDIAN) {
-        return { ...commit, currentPhase: 'NIGHT_GUARDIAN' };
-      }
+      const guardian = aliveOf(state, 'GUARDIAN').find(p => !getActs(state, 'GUARDIAN')[p.id] && getLivingTargets(state, 'GUARDIAN', p.id).length > 0);
+      if (guardian) return route('NIGHT_GUARDIAN', guardian);
 
-      const sheriff = state.players.find(p => p.role === 'SHERIFF' && p.alive);
-      const sheriffTargets = getLivingTargets(state, 'SHERIFF');
-      if (sheriff && state.nightNumber > 1 && !state.sheriffUsed && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0) {
-        return { ...commit, currentPhase: 'NIGHT_SHERIFF' };
-      }
+      const sheriff = aliveOf(state, 'SHERIFF').find(p => !getActs(state, 'SHERIFF')[p.id] && state.nightNumber > 1 && !isUsed(state, p.id, 'SHERIFF') && getLivingTargets(state, 'SHERIFF', p.id).length > 0);
+      if (sheriff) return route('NIGHT_SHERIFF', sheriff);
 
-      const seer = state.players.find(p => p.role === 'SEER' && p.alive);
-      const seerTargets = getLivingTargets(state, 'SEER');
-      if (seer && seerTargets.length > 0 && !state.seerTargetId && !state.nightSkips?.SEER) {
-        return { ...commit, currentPhase: 'NIGHT_SEER' };
-      }
+      const seer = aliveOf(state, 'SEER').find(p => !getActs(state, 'SEER')[p.id] && getLivingTargets(state, 'SEER', p.id).length > 0);
+      if (seer) return route('NIGHT_SEER', seer);
 
-      const witch = state.players.find(p => p.role === 'WITCH' && p.alive);
-      const witchTargets = getLivingTargets(state, 'WITCH');
-      const witchCanKill = state.nightNumber > 1; 
-      if (witch && witchTargets.length > 0 && !state.nightSkips?.WITCH && (!state.witchHealUsed || (!state.witchKillUsed && witchCanKill))) {
-        return { ...commit, currentPhase: 'NIGHT_WITCH' };
-      }
+      const witch = aliveOf(state, 'WITCH').find(p => !getActs(state, 'WITCH')[p.id] && (!isUsed(state, p.id, 'WITCH_HEAL') || (!isUsed(state, p.id, 'WITCH_KILL') && state.nightNumber > 1)));
+      if (witch) return route('NIGHT_WITCH', witch);
 
       return resolveNightActions(commit);
     });
@@ -182,33 +174,37 @@ export default function App() {
     let log = [...state.gameLog];
     const night = state.nightNumber, day = state.dayNumber;
     const directDeaths = [];
-    const protectedByTown = new Set([state.guardianTargetId].filter(Boolean));
+    const guardianActs = getActs(state, 'GUARDIAN');
+    const witchActs = getActs(state, 'WITCH');
+    const protectedByTown = new Set(Object.values(guardianActs).map(a => a.targetId).filter(Boolean));
+    const healedSet = new Set(Object.values(witchActs).map(a => a.healTargetId).filter(Boolean));
 
     const wolfTargets = Array.from(new Set([...(state.werewolfTargetIds || []), state.werewolfTargetId].filter(Boolean)));
     wolfTargets.forEach(targetId => {
       const victimName = updatedPlayers.find(p => p.id === targetId)?.name;
       if (!victimName) return;
-      if (protectedByTown.has(targetId)) { log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${victimName} berhasil dicegah Guardian.`); } 
-      else if (state.witchHealUsedThisNight && state.witchHealTargetId === targetId) { log = addLog(log, night, day, 'INFO', `Heal Potion Witch berhasil menyelamatkan korban Werewolf.`); } 
+      if (protectedByTown.has(targetId)) { log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${victimName} berhasil dicegah Guardian.`); }
+      else if (healedSet.has(targetId)) { log = addLog(log, night, day, 'INFO', `Heal Potion Witch berhasil menyelamatkan korban Werewolf.`); }
       else { directDeaths.push({ id: targetId, reason: 'WEREWOLF' }); }
     });
 
-    if (state.sheriffTargetId) {
-      const sheriff = updatedPlayers.find(p => p.role === 'SHERIFF' && p.alive);
-      const target = updatedPlayers.find(p => p.id === state.sheriffTargetId && p.alive);
-      if (sheriff && target) {
-        if (isWolfAligned(target)) { directDeaths.push({ id: target.id, reason: 'SHERIFF' }); log = addLog(log, night, day, 'ACTION', `Sheriff berhasil menemukan Werewolf: ${target.name}.`); } 
-        else { directDeaths.push({ id: sheriff.id, reason: 'SHERIFF_MISS' }); log = addLog(log, night, day, 'ACTION', `Sheriff salah memilih target dan tereliminasi.`); }
-      }
-    }
+    Object.entries(getActs(state, 'SHERIFF')).forEach(([actorId, act]) => {
+      if (!act || !act.targetId) return;
+      const sheriff = updatedPlayers.find(p => p.id === actorId && p.alive);
+      const target = updatedPlayers.find(p => p.id === act.targetId && p.alive);
+      if (!sheriff || !target) return;
+      if (isWolfAligned(target)) { directDeaths.push({ id: target.id, reason: 'SHERIFF' }); log = addLog(log, night, day, 'ACTION', `Sheriff ${sheriff.name} berhasil menemukan Werewolf: ${target.name}.`); }
+      else { directDeaths.push({ id: sheriff.id, reason: 'SHERIFF_MISS' }); log = addLog(log, night, day, 'ACTION', `Sheriff ${sheriff.name} salah memilih target dan tereliminasi.`); }
+    });
 
-    if (state.witchKillTargetId) {
-      directDeaths.push({ id: state.witchKillTargetId, reason: 'WITCH' });
+    Object.entries(witchActs).forEach(([actorId, act]) => {
+      if (!act || !act.killTargetId) return;
+      directDeaths.push({ id: act.killTargetId, reason: 'WITCH' });
       log = addLog(log, night, day, 'ACTION', `Witch menggunakan Kill Potion.`);
-    }
+    });
 
     const newDeathsMap = new Map();
-    directDeaths.forEach(d => newDeathsMap.set(d.id, d.reason));
+    directDeaths.forEach(d => { if (!newDeathsMap.has(d.id)) newDeathsMap.set(d.id, d.reason); });
     const loverDeathNotice = [];
 
     let changed = true;
@@ -232,25 +228,27 @@ export default function App() {
     const nightDeathsList = [];
     newDeathsMap.forEach((reason, deadId) => {
       const idx = updatedPlayers.findIndex(p => p.id === deadId);
-      if (idx === -1) return;
+      if (idx === -1 || !updatedPlayers[idx].alive) return;
       updatedPlayers[idx].alive = false; updatedPlayers[idx].deathReason = reason; updatedPlayers[idx].deathNight = night;
       nightDeathsList.push({ player: updatedPlayers[idx], reason });
       log = addLog(log, night, day, 'DEATH', `${updatedPlayers[idx].name} tereliminasi.`);
     });
 
-    updatedPlayers = updatedPlayers.map(p => ({ ...p, protectedLastNight: p.id === state.guardianTargetId, protectedThisNight: false }));
-    let doppelgangerRoleChangeNotice = null;
-    ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, night, day, state.doppelgangerTargetId));
+    // Guardian tidak boleh melindungi target yang sama dua malam berturut-turut (per Guardian)
+    const guardianLast = {};
+    Object.entries(guardianActs).forEach(([actorId, act]) => { guardianLast[actorId] = (act && act.targetId) || null; });
+    updatedPlayers = updatedPlayers.map(p => ({ ...p, protectedLastNight: false, protectedThisNight: false }));
+
+    const dop = applyDoppelgangerCopies(state, updatedPlayers, log, night, day);
+    updatedPlayers = dop.players; log = dop.log;
 
     let tempState = {
-      ...state, players: updatedPlayers, gameLog: log, lastNightDeaths: nightDeathsList,
+      ...state, ...dop.patch, players: updatedPlayers, gameLog: log, lastNightDeaths: nightDeathsList,
       wolfCubRagePending: nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
-      hunterPending: nightDeathsList.some(d => d.player.role === 'HUNTER' && !d.player.hunterRevengeUsed), loverDeathNotice, doppelgangerRoleChangeNotice,
-      werewolfTargetId: null, werewolfTargetIds: [], guardianTargetId: null, sheriffTargetId: null, seerTargetId: null, seerResult: null,
-      witchHealUsedThisNight: false, witchHealTargetId: null, witchKillTargetId: null, hunterTargetId: null, nightSkips: {},
+      loverDeathNotice, doppelgangerNotices: dop.notices,
+      werewolfTargetId: null, werewolfTargetIds: [], nightActs: {}, draft: {}, nightActorId: null, guardianLast, seerResult: null, nightSkips: {},
     };
 
-    if (doppelgangerRoleChangeNotice) tempState = resetDoppelgangerAbilityState(tempState, doppelgangerRoleChangeNotice.newRole);
     tempState = activateTraitorIfNeeded(tempState);
     log = tempState.gameLog;
     return finalizeResolution({ ...tempState, gameLog: log }, 'NIGHT');
@@ -274,6 +272,8 @@ export default function App() {
 
   function checkWinConditions(state) {
     const living = state.players.filter(p => p.alive);
+    // Lovers beda tim menang bersama jika hanya mereka berdua yang tersisa
+    if (living.length === 2 && living[0].loverId === living[1].id && living[1].loverId === living[0].id && isWolfAligned(living[0]) !== isWolfAligned(living[1])) return 'LOVERS';
     const livingEvil = living.filter(isWolfAligned);
     const livingGood = living.filter(p => !isWolfAligned(p) && p.role !== 'JESTER');
     if (livingEvil.length === 0) return 'WARGA';
@@ -292,8 +292,11 @@ export default function App() {
       counts[id] = n;
       total += n;
     });
-    const mayor = (state.players || []).find(p => p.role === 'MAYOR' && p.alive);
-    if (mayor && state.mayorRevealed && state.mayorVoteTargetId && counts[state.mayorVoteTargetId]) counts[state.mayorVoteTargetId] += 1;
+    const revealed = state.mayorRevealedIds || [];
+    (state.players || []).filter(p => p.role === 'MAYOR' && p.alive && revealed.includes(p.id)).forEach(m => {
+      const t = (state.mayorVotes || {})[m.id];
+      if (t && counts[t]) counts[t] += 1;
+    });
     return { counts, total };
   }
 
@@ -338,7 +341,7 @@ export default function App() {
       return { ...state, hunterPending: true, hunterSource: source, currentPhase: 'HUNTER_REVENGE' };
     }
     let log = state.gameLog;
-    if (winResult) log = addLog(log, night, day, 'WIN', winResult === 'WARGA' ? 'Kemenangan Tim WARGA!' : 'Kemenangan Tim WEREWOLF!');
+    if (winResult) log = addLog(log, night, day, 'WIN', winResult === 'WARGA' ? 'Kemenangan Tim WARGA!' : winResult === 'LOVERS' ? 'Kemenangan LOVERS (beda tim)!' : 'Kemenangan Tim WEREWOLF!');
     let next = { ...state, hunterPending: false, hunterSource: null, gameLog: log };
     let nextPhase;
     if (winResult) { next.winner = winResult; nextPhase = 'GAME_OVER'; }
@@ -347,52 +350,51 @@ export default function App() {
       nextPhase = 'NIGHT_INTRO';
       next = {
         ...next, nightNumber: night + 1, dayNumber: day + 1,
-        voteTally: {}, voteRecorded: false, mayorVoteTargetId: null, currentVoterIndex: 0,
+        voteTally: {}, voteRecorded: false, mayorVotes: {}, currentVoterIndex: 0,
         discussionEndTimestamp: null, isTimerPaused: false, pausedRemainingSeconds: null,
         gameLog: addLog(log, night + 1, day + 1, 'INFO', `Memulai Malam ${night + 1}.`)
       };
     }
-    if (next.doppelgangerRoleChangeNotice) return { ...next, currentPhase: 'DOPPELGANGER_REVEAL', doppelgangerRevealNextPhase: nextPhase };
+    if ((next.doppelgangerNotices || []).length > 0) return { ...next, currentPhase: 'DOPPELGANGER_REVEAL', doppelgangerRevealNextPhase: nextPhase };
     return { ...next, currentPhase: nextPhase };
   }
 
 
   const handleSeerInspect = (targetId) => {
-    const validation = validateTarget(gameState, 'SEER', targetId);
-    if (!validation.valid) return;
+    const actor = getActor(gameState);
+    if (!actor || !validateTarget(gameState, 'SEER', targetId, actor.id).valid) return;
     const target = gameState.players.find(p => p.id === targetId);
     if (!target) return;
     let displayedRole = target.role, isLycanNote = false;
     if (target.role === 'LYCAN') { displayedRole = 'WEREWOLF'; isLycanNote = true; }
     else if (target.role === 'JESTER') { displayedRole = 'WARGA'; }
-    setGameState(prev => ({ ...prev, seerTargetId: targetId, seerResult: { targetName: target.name, displayedRole, isLycanNote }, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Seer meramal ${target.name}.`) }));
+    else if (target.role === 'TRAITOR') { displayedRole = target.convertedToWerewolf ? 'WEREWOLF' : 'WARGA'; }
+    setGameState(prev => ({ ...prev, nightActs: withAct(prev, 'SEER', actor.id, { targetId }), seerResult: { targetName: target.name, displayedRole, isLycanNote }, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Seer ${actor.name} meramal ${target.name}.`) }));
   };
 
   const handleConfirmCupid = () => {
-    const { cupidLover1Id, cupidLover2Id, players, nightNumber, dayNumber } = gameState;
-    if (!cupidLover1Id || !cupidLover2Id || cupidLover1Id === cupidLover2Id) return;
-    const p1 = players.find(p => p.id === cupidLover1Id), p2 = players.find(p => p.id === cupidLover2Id);
-    if (!p1?.alive || !p2?.alive) return;
-    const updatedPlayers = players.map(p => p.id === cupidLover1Id ? { ...p, loverId: cupidLover2Id } : p.id === cupidLover2Id ? { ...p, loverId: cupidLover1Id } : p);
-    advanceNightPhase({ players: updatedPlayers, cupidUsed: true, cupidResolved: true, gameLog: addLog(gameState.gameLog, nightNumber, dayNumber, 'ACTION', `Cupid memilih ${p1.name} & ${p2.name}.`) }, { recordUndo: true });
+    const actor = getActor(gameState);
+    const { l1, l2 } = gameState.draft || {};
+    if (!actor || !l1 || !l2 || l1 === l2) return;
+    const p1 = gameState.players.find(p => p.id === l1), p2 = gameState.players.find(p => p.id === l2);
+    if (!p1?.alive || !p2?.alive || p1.loverId || p2.loverId) return;
+    const updatedPlayers = gameState.players.map(p => p.id === l1 ? { ...p, loverId: l2 } : p.id === l2 ? { ...p, loverId: l1 } : p);
+    advanceNightPhase({ players: updatedPlayers, nightActs: withAct(gameState, 'CUPID', actor.id, { l1, l2 }), abilityUsed: markUsed(gameState, actor.id, 'CUPID'), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Cupid ${actor.name} memilih ${p1.name} & ${p2.name}.`) }, { recordUndo: true });
   };
 
   const handleConfirmDoppelganger = () => {
-    const targetId = gameState.doppelgangerTargetId;
-    const validation = validateTarget(gameState, 'DOPPELGANGER', targetId);
-    if (!validation.valid) return;
+    const actor = getActor(gameState);
+    const targetId = (gameState.draft || {}).targetId;
+    if (!actor || !validateTarget(gameState, 'DOPPELGANGER', targetId, actor.id).valid) return;
     const target = gameState.players.find(p => p.id === targetId);
-    advanceNightPhase({ doppelgangerTargetId: targetId, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Doppelganger memilih ${target.name}.`) }, { recordUndo: true });
+    advanceNightPhase({ doppelgangerTargets: { ...(gameState.doppelgangerTargets || {}), [actor.id]: targetId }, draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Doppelganger ${actor.name} memilih ${target.name}.`) }, { recordUndo: true });
   };
 
   const handleConfirmSheriff = () => {
-    const validation = validateTarget(gameState, 'SHERIFF', gameState.sheriffTargetId);
-    if (!validation.valid) return;
-    advanceNightPhase({ sheriffResolved: true, sheriffUsed: true, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', 'Sheriff menggunakan kemampuan.') }, { recordUndo: true });
-  };
-
-  const handleSkipSheriff = () => {
-    advanceNightPhase({ sheriffTargetId: null, sheriffSkippedNights: [...(gameState.sheriffSkippedNights || []), gameState.nightNumber], nightSkips: { ...(gameState.nightSkips || {}), SHERIFF: true }, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'INFO', `Sheriff SKIP malam ini.`) }, { recordUndo: true });
+    const actor = getActor(gameState);
+    const targetId = (gameState.draft || {}).targetId;
+    if (!actor || !validateTarget(gameState, 'SHERIFF', targetId, actor.id).valid) return;
+    advanceNightPhase({ nightActs: withAct(gameState, 'SHERIFF', actor.id, { targetId }), abilityUsed: markUsed(gameState, actor.id, 'SHERIFF'), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Sheriff ${actor.name} menggunakan kemampuan.`) }, { recordUndo: true });
   };
 
   const handleConfirmWerewolf = (selectedIds) => {
@@ -403,25 +405,35 @@ export default function App() {
   };
 
   const handleConfirmGuardian = () => {
-    const validation = validateTarget(gameState, 'GUARDIAN', gameState.guardianTargetId);
-    if (!validation.valid) return;
-    advanceNightPhase({ guardianTargetId: gameState.guardianTargetId, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', 'Guardian mengunci target.') }, { recordUndo: true });
+    const actor = getActor(gameState);
+    const targetId = (gameState.draft || {}).targetId;
+    if (!actor || !validateTarget(gameState, 'GUARDIAN', targetId, actor.id).valid) return;
+    advanceNightPhase({ nightActs: withAct(gameState, 'GUARDIAN', actor.id, { targetId }), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Guardian ${actor.name} mengunci target.`) }, { recordUndo: true });
   };
 
   const handleFinishWitch = () => {
-    let nextState = { witchHealUsed: gameState.witchHealUsed || !!gameState.witchHealTargetId, witchKillUsed: gameState.witchKillUsed || !!gameState.witchKillTargetId };
-    advanceNightPhase({ ...nextState, nightSkips: { ...(gameState.nightSkips || {}), WITCH: true } }, { recordUndo: true });
+    const actor = getActor(gameState);
+    if (!actor) return;
+    const d = gameState.draft || {};
+    const healOk = !isUsed(gameState, actor.id, 'WITCH_HEAL');
+    const killOk = !isUsed(gameState, actor.id, 'WITCH_KILL') && gameState.nightNumber > 1;
+    const alive = (id) => !!id && gameState.players.some(p => p.id === id && p.alive);
+    const healTargetId = healOk && alive(d.healTargetId) ? d.healTargetId : null;
+    const killTargetId = killOk && alive(d.killTargetId) ? d.killTargetId : null;
+    let abilityUsed = gameState.abilityUsed || {};
+    if (healTargetId) abilityUsed = markUsed({ abilityUsed }, actor.id, 'WITCH_HEAL');
+    if (killTargetId) abilityUsed = markUsed({ abilityUsed }, actor.id, 'WITCH_KILL');
+    advanceNightPhase({ nightActs: withAct(gameState, 'WITCH', actor.id, { healTargetId, killTargetId }), abilityUsed, draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Witch ${actor.name} selesai beraksi.`) }, { recordUndo: true });
   };
 
   const handleSkipNightAction = (roleKey, message) => {
-    const cleared = { nightSkips: { ...(gameState.nightSkips || {}), [roleKey]: true }, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'INFO', message) };
+    const actor = getActor(gameState);
+    const cleared = { draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'INFO', message) };
     switch (roleKey) {
-      case 'CUPID': cleared.cupidLover1Id = null; cleared.cupidLover2Id = null; cleared.cupidResolved = true; break;
-      case 'WEREWOLF': cleared.werewolfTargetId = null; cleared.werewolfTargetIds = []; break;
-      case 'GUARDIAN': cleared.guardianTargetId = null; break;
-      case 'DOPPELGANGER': cleared.doppelgangerTargetId = null; break;
-      case 'SEER': cleared.seerTargetId = null; cleared.seerResult = null; break;
-      case 'WITCH': cleared.witchHealTargetId = null; cleared.witchKillTargetId = null; cleared.witchHealUsedThisNight = false; break;
+      case 'WEREWOLF': cleared.nightSkips = { ...(gameState.nightSkips || {}), WEREWOLF: true }; cleared.werewolfTargetId = null; cleared.werewolfTargetIds = []; break;
+      case 'DOPPELGANGER': if (actor) cleared.doppelgangerTargets = { ...(gameState.doppelgangerTargets || {}), [actor.id]: null }; break;
+      case 'CUPID': if (actor) { cleared.nightActs = withAct(gameState, 'CUPID', actor.id, { skipped: true }); cleared.abilityUsed = markUsed(gameState, actor.id, 'CUPID'); } break;
+      default: if (actor) cleared.nightActs = withAct(gameState, roleKey, actor.id, { skipped: true });
     }
     advanceNightPhase(cleared, { recordUndo: true });
   };
@@ -436,64 +448,53 @@ export default function App() {
       const startLog = addLog(prev.gameLog, night, day, 'DEATH', `Hunter ${hunter.name} membalas dengan mengeliminasi ${target.name}.`);
       const marked = prev.players.map(p => p.id === hunter.id ? { ...p, hunterRevengeUsed: true } : p);
       const res = applyDeathsWithLovers(marked, startLog, [{ id: target.id, reason: 'HUNTER' }], night, day, { deathDay: day, deathNight: night });
-      const dop = applyDoppelgangerRoleIfTargetDead(res.players, res.log, night, day, prev.doppelgangerTargetId);
+      const dop = applyDoppelgangerCopies(prev, res.players, res.log, night, day);
       const deathsField = source === 'DAY' ? 'lastDayDeaths' : 'lastNightDeaths';
       let tempState = {
-        ...prev, undoStack: pushUndoState(prev), players: dop.players, gameLog: dop.log, hunterTargetId: null,
+        ...prev, ...dop.patch, undoStack: pushUndoState(prev), players: dop.players, gameLog: dop.log, hunterTargetId: null,
         [deathsField]: [...(prev[deathsField] || []), ...res.deaths],
         loverDeathNotice: [...(prev.loverDeathNotice || []), ...res.loverNotices],
-        doppelgangerRoleChangeNotice: dop.notice || prev.doppelgangerRoleChangeNotice || null,
+        doppelgangerNotices: [...(prev.doppelgangerNotices || []), ...dop.notices],
         wolfCubRagePending: prev.wolfCubRagePending || res.deaths.some(d => d.player.role === 'WOLF_CUB')
       };
-      if (dop.notice) tempState = resetDoppelgangerAbilityState(tempState, dop.notice.newRole);
       tempState = activateTraitorIfNeeded(tempState);
       return finalizeResolution(tempState, source);
     });
   };
 
-  const handleMayorReveal = () => {
-    const mayor = gameState.players.find(p => p.role === 'MAYOR' && p.alive);
-    if (!mayor || gameState.mayorRevealed) return;
-    setGameState(prev => ({ ...prev, mayorRevealed: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkap identitas. Suaranya bernilai 2.`) }));
+  const handleMayorReveal = (mayorId) => {
+    const mayor = gameState.players.find(p => p.id === mayorId && p.role === 'MAYOR' && p.alive);
+    if (!mayor || (gameState.mayorRevealedIds || []).includes(mayorId)) return;
+    setGameState(prev => ({ ...prev, mayorRevealedIds: [...(prev.mayorRevealedIds || []), mayorId], gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkap identitas. Suaranya bernilai 2.`) }));
   };
 
-  const resetDoppelgangerAbilityState = (state, copiedRole) => {
-    const next = { ...state };
-    switch (copiedRole) {
-      case 'SHERIFF': next.sheriffUsed = false; next.sheriffResolved = false; next.sheriffTargetId = null; break;
-      case 'MAYOR': next.mayorRevealed = false; break;
-      case 'WITCH': next.witchHealUsed = false; next.witchKillUsed = false; next.witchHealUsedThisNight = false; next.witchHealTargetId = null; next.witchKillTargetId = null; break;
-      case 'CUPID': next.cupidUsed = false; next.cupidLover1Id = null; next.cupidLover2Id = null; break;
-    }
-    return next;
-  };
-
-  const applyDoppelgangerRoleIfTargetDead = (players, log, nightNumber, dayNumber, targetId = null) => {
-    const doppel = players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
-    if (!doppel || !targetId) return { players, log, notice: null };
-    const target = players.find(p => p.id === targetId);
-    if (!target || target.alive) return { players, log, notice: null };
-    const idx = players.findIndex(p => p.id === doppel.id);
-    if (idx === -1) return { players, log, notice: null };
-    
-    const copiedRole = target.role;
-    const updatedPlayers = [...players];
-    updatedPlayers[idx] = { 
-      ...updatedPlayers[idx], 
-      role: copiedRole, 
-      team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' }), 
-      doppelgangerCopied: true 
-    };
-
-    const reminderMsg = `⚠️ PENGINGAT MODERATOR: Target Doppelganger (${target.name}) telah mati. Doppelganger (${doppel.name}) resmi mewarisi role ${ROLES[copiedRole]?.name}!`;
-    const updatedLog = addLog(log, nightNumber, dayNumber, 'ACTION', reminderMsg);
-
-    return { 
-      players: updatedPlayers, 
-      log: updatedLog, 
-      notice: { playerName: doppel.name, targetName: target.name, oldRole: doppel.role, newRole: copiedRole } 
-    };
-  };
+  // Setiap Doppelganger yang targetnya sudah mati menyalin role target. Kemampuan sekali-pakai
+  // dicatat per id pemain, jadi hasil salinan otomatis mendapat kemampuan "segar".
+  function applyDoppelgangerCopies(state, playersIn, logIn, night, day) {
+    const targets = state.doppelgangerTargets || {};
+    const players = [...playersIn];
+    let log = logIn;
+    const notices = [];
+    const abilityUsed = { ...(state.abilityUsed || {}) };
+    let mayorRevealedIds = [...(state.mayorRevealedIds || [])];
+    playersIn.filter(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied).forEach(doppel => {
+      const targetId = targets[doppel.id];
+      const target = targetId ? players.find(p => p.id === targetId) : null;
+      if (!target || target.alive || target.role === 'DOPPELGANGER') return;
+      const copiedRole = target.role;
+      const idx = players.findIndex(p => p.id === doppel.id);
+      players[idx] = {
+        ...players[idx], role: copiedRole,
+        team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' }),
+        doppelgangerCopied: true
+      };
+      delete abilityUsed[doppel.id];
+      mayorRevealedIds = mayorRevealedIds.filter(id => id !== doppel.id);
+      log = addLog(log, night, day, 'ACTION', `⚠️ PENGINGAT MODERATOR: Target Doppelganger (${target.name}) telah mati. Doppelganger (${doppel.name}) resmi mewarisi role ${ROLES[copiedRole]?.name}!`);
+      notices.push({ playerId: doppel.id, playerName: doppel.name, targetName: target.name, oldRole: doppel.role, newRole: copiedRole });
+    });
+    return { players, log, notices, patch: { abilityUsed, mayorRevealedIds } };
+  }
 
   const resolveVotingResults = () => {
     let log = [...gameState.gameLog];
@@ -505,28 +506,28 @@ export default function App() {
     const allVotesSkipped = validVoteCount === 0;
 
     let updatedPlayers = players.map(p => ({ ...p }));
-    let dayDeaths = [], loverDeathNotice = [], doppelgangerRoleChangeNotice = null;
+    let dayDeaths = [], loverDeathNotice = [], dopNotices = [], dopPatch = {};
 
     if (topCandidates.length === 1) {
       const eliminatedPlayer = updatedPlayers.find(p => p.id === topCandidates[0]);
       log = addLog(log, nightNumber, dayNumber, 'ACTION', `${eliminatedPlayer.name} tereliminasi (${maxVotes} suara).`);
       const res = applyDeathsWithLovers(updatedPlayers, log, [{ id: eliminatedPlayer.id, reason: 'VOTE' }], nightNumber, dayNumber, { deathDay: dayNumber });
       updatedPlayers = res.players; log = res.log; dayDeaths = res.deaths; loverDeathNotice = res.loverNotices;
-      ({ players: updatedPlayers, log, notice: doppelgangerRoleChangeNotice } = applyDoppelgangerRoleIfTargetDead(updatedPlayers, log, nightNumber, dayNumber, gameState.doppelgangerTargetId));
+      const dop = applyDoppelgangerCopies(gameState, updatedPlayers, log, nightNumber, dayNumber);
+      updatedPlayers = dop.players; log = dop.log; dopNotices = dop.notices; dopPatch = dop.patch;
 
       if (eliminatedPlayer.role === 'JESTER') {
         log = addLog(log, nightNumber, dayNumber, 'WIN', `Jester ${eliminatedPlayer.name} menang!`);
-        setGameState({ ...gameState, undoStack: pushUndoState(gameState), players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerRoleChangeNotice: null, currentPhase: 'GAME_OVER', winner: 'JESTER' });
+        setGameState({ ...gameState, undoStack: pushUndoState(gameState), players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerNotices: [], currentPhase: 'GAME_OVER', winner: 'JESTER' });
         return;
       }
     } else if (allVotesSkipped) log = addLog(log, nightNumber, dayNumber, 'INFO', `Semua pemain SKIP VOTE.`);
     else log = addLog(log, nightNumber, dayNumber, 'INFO', `Hasil voting seri!`);
 
     let tempState = {
-      ...gameState, undoStack: pushUndoState(gameState), players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerRoleChangeNotice,
+      ...gameState, ...dopPatch, undoStack: pushUndoState(gameState), players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerNotices: dopNotices,
       wolfCubRagePending: gameState.wolfCubRagePending || dayDeaths.some(d => d.player.role === 'WOLF_CUB')
     };
-    if (doppelgangerRoleChangeNotice) tempState = resetDoppelgangerAbilityState(tempState, doppelgangerRoleChangeNotice.newRole);
     tempState = activateTraitorIfNeeded(tempState);
     setGameState(finalizeResolution(tempState, 'DAY'));
   };
@@ -563,7 +564,7 @@ export default function App() {
   };
   const handleNewGame = () => { try { localStorage.removeItem(LOCAL_STORAGE_KEY); } catch (e) {} setGameState(createInitialGameState()); };
   const handleContinueGame = () => setGameState(prev => ({ ...prev, currentPhase: prev.resumePhase || 'NIGHT_INTRO', resumePhase: null }));
-  const handleContinueAfterDoppelReveal = () => setGameState(prev => ({ ...prev, currentPhase: prev.doppelgangerRevealNextPhase || 'MORNING', doppelgangerRoleChangeNotice: null, doppelgangerRevealNextPhase: null }));
+  const handleContinueAfterDoppelReveal = () => setGameState(prev => ({ ...prev, currentPhase: prev.doppelgangerRevealNextPhase || 'MORNING', doppelgangerNotices: [], doppelgangerRevealNextPhase: null }));
 
   const formatTime = (totalSec) => `${Math.floor(totalSec / 60).toString().padStart(2, '0')}:${(totalSec % 60).toString().padStart(2, '0')}`;
 
@@ -576,7 +577,7 @@ export default function App() {
       NIGHT_INTRO: [`MALAM ${gameState.nightNumber}`, 'Semua pemain tutup mata.', 'NEXT: Mulai aksi malam.'],
       MORNING: [`PAGI ${gameState.dayNumber}`, `${(gameState.lastNightDeaths || []).length} pemain tereliminasi.`, 'NEXT: Masuk diskusi.'],
       DISCUSSION: ['DISKUSI', gameState.discussionEndTimestamp ? `Timer ${formatTime(remainingSeconds)} tersisa.` : 'Timer belum dimulai.', 'NEXT: Selesaikan untuk voting.'],
-      VOTING: ['VOTING', `${computeVoteCounts({ ...gameState, mayorRevealed: false }).total}/${living.length} suara tercatat.`, 'NEXT: Proses hasil voting.'],
+      VOTING: ['VOTING', `${computeVoteCounts({ ...gameState, mayorRevealedIds: [] }).total}/${living.length} suara tercatat.`, 'NEXT: Proses hasil voting.'],
       HUNTER_REVENGE: ['HUNTER REVENGE', 'Hunter membalas dendam.', 'NEXT: Pilih target hidup.'],
       GAME_OVER: ['GAME OVER', 'Permainan selesai.', 'NEXT: Mulai game baru.']
     };
@@ -633,7 +634,6 @@ export default function App() {
     if (wolfCount === 0) setupIssues.push('Minimal harus ada 1 Werewolf atau Wolf Cub.');
     const setupWarnings = [];
     if (wolfCount > 0 && wolfCount * 2 >= playerCount) setupWarnings.push('Jumlah Werewolf sudah ≥ separuh pemain, game bisa langsung berakhir.');
-    SINGLE_ROLES.filter(k => (Number(roleCountsDraft[k]) || 0) > 1).forEach(k => setupWarnings.push(`${ROLES[k]?.name || k} lebih dari 1: logika game hanya memproses 1 pemain untuk role ini.`));
     const canStart = setupIssues.length === 0;
     return (
     <div className="max-w-xl mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
@@ -686,7 +686,7 @@ export default function App() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.max(0, value - 1) }))} className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                   <div className="flex-1 text-center font-black text-white text-xs">{value}</div>
-                  <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.min(playerCount, SINGLE_ROLES.includes(roleKey) ? Math.max(value, 1) : value + 1) }))} className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
+                  <button onClick={() => setRoleCountsDraft(prev => ({ ...prev, [roleKey]: Math.min(playerCount, value + 1) }))} className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                 </div>
               </div>
             );
@@ -784,20 +784,29 @@ export default function App() {
     </div>
   );
 
-  const renderNightCupid = () => (
-    <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-pink-950/90 border border-pink-700/60 text-pink-400 shadow-lg"><Heart className="w-8 h-8 fill-current" /></div><h2 className="text-2xl font-black text-pink-400">CUPID</h2><p className="text-xs sm:text-sm text-slate-300">Pilih dua pemain hidup untuk terikat menjadi Lovers.</p></div>
-      <div className="bg-slate-900/90 border border-pink-900/50 rounded-3xl p-4 text-center space-y-2 shadow-xl"><span className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Pasangan Terpilih:</span><div className="flex items-center justify-center gap-3 text-lg font-black text-white"><span className={gameState.cupidLover1Id ? 'text-pink-400' : 'text-slate-600'}>{gameState.players.find(p => p.id === gameState.cupidLover1Id)?.name || '[ Pemain 1 ]'}</span><Heart className="w-5 h-5 text-pink-500 fill-current" /><span className={gameState.cupidLover2Id ? 'text-pink-400' : 'text-slate-600'}>{gameState.players.find(p => p.id === gameState.cupidLover2Id)?.name || '[ Pemain 2 ]'}</span></div></div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
-        {gameState.players.filter(p => p.alive).map(player => {
-          const isSelected = gameState.cupidLover1Id === player.id || gameState.cupidLover2Id === player.id;
-          return <button key={player.id} onClick={() => setGameState(prev => { if (prev.cupidLover1Id === player.id) return { ...prev, cupidLover1Id: null }; if (prev.cupidLover2Id === player.id) return { ...prev, cupidLover2Id: null }; if (!prev.cupidLover1Id) return { ...prev, cupidLover1Id: player.id }; if (!prev.cupidLover2Id) return { ...prev, cupidLover2Id: player.id }; return { ...prev, cupidLover2Id: player.id }; })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-pink-950/80 border-pink-500 text-pink-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <Heart className="w-4 h-4 text-pink-400 fill-current shrink-0" />}</button>;
-        })}
+  const actorBanner = (actor) => actor ? (<div className="text-center"><span className="inline-block px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-[11px] font-black text-amber-300">Giliran: {actor.name}</span></div>) : null;
+  const setDraft = (patch) => setGameState(prev => ({ ...prev, draft: { ...(prev.draft || {}), ...patch } }));
+
+  const renderNightCupid = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    const options = getLivingTargets(gameState, 'CUPID', actor?.id);
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-pink-950/90 border border-pink-700/60 text-pink-400 shadow-lg"><Heart className="w-8 h-8 fill-current" /></div><h2 className="text-2xl font-black text-pink-400">CUPID</h2><p className="text-xs sm:text-sm text-slate-300">Pilih dua pemain hidup untuk terikat menjadi Lovers.</p></div>
+        {actorBanner(actor)}
+        <div className="bg-slate-900/90 border border-pink-900/50 rounded-3xl p-4 text-center space-y-2 shadow-xl"><span className="text-[10px] font-black text-pink-300 uppercase tracking-widest">Pasangan Terpilih:</span><div className="flex items-center justify-center gap-3 text-lg font-black text-white"><span className={draft.l1 ? 'text-pink-400' : 'text-slate-600'}>{gameState.players.find(p => p.id === draft.l1)?.name || '[ Pemain 1 ]'}</span><Heart className="w-5 h-5 text-pink-500 fill-current" /><span className={draft.l2 ? 'text-pink-400' : 'text-slate-600'}>{gameState.players.find(p => p.id === draft.l2)?.name || '[ Pemain 2 ]'}</span></div></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
+          {options.map(player => {
+            const isSelected = draft.l1 === player.id || draft.l2 === player.id;
+            return <button key={player.id} onClick={() => setGameState(prev => { const d = prev.draft || {}; if (d.l1 === player.id) return { ...prev, draft: { ...d, l1: null } }; if (d.l2 === player.id) return { ...prev, draft: { ...d, l2: null } }; if (!d.l1) return { ...prev, draft: { ...d, l1: player.id } }; if (!d.l2) return { ...prev, draft: { ...d, l2: player.id } }; return { ...prev, draft: { ...d, l2: player.id } }; })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-pink-950/80 border-pink-500 text-pink-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <Heart className="w-4 h-4 text-pink-400 fill-current shrink-0" />}</button>;
+          })}
+        </div>
+        <button onClick={() => handleSkipNightAction('CUPID', 'Cupid memilih SKIP.')} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition">SKIP CUPID</button>
+        <div className="flex gap-3 pt-2"><button onClick={() => setDraft({ l1: null, l2: null })} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-sm transition">Reset</button><button onClick={handleConfirmCupid} disabled={!draft.l1 || !draft.l2} className="w-2/3 py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 disabled:opacity-40 text-white font-black text-sm shadow-xl transition">KONFIRMASI PASANGAN</button></div>
       </div>
-      <button onClick={() => handleSkipNightAction('CUPID', 'Cupid memilih SKIP.')} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition">SKIP CUPID</button>
-      <div className="flex gap-3 pt-2"><button onClick={() => setGameState(prev => ({ ...prev, cupidLover1Id: null, cupidLover2Id: null }))} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-sm transition">Reset</button><button onClick={handleConfirmCupid} className="w-2/3 py-3.5 rounded-2xl bg-pink-600 hover:bg-pink-500 text-white font-black text-sm shadow-xl transition">KONFIRMASI PASANGAN</button></div>
-    </div>
-  );
+    );
+  };
 
   const renderNightWerewolf = () => {
     const livingCandidates = gameState.players.filter(p => p.alive && !isWolfAligned(p));
@@ -841,66 +850,93 @@ export default function App() {
     );
   };
 
-  const renderNightGuardian = () => (
-    <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-950/90 border border-blue-700/60 text-blue-400 shadow-lg"><Shield className="w-8 h-8" /></div><h2 className="text-2xl font-black text-blue-400">GUARDIAN PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk dilindungi malam ini.</p></div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
-        {gameState.players.filter(p => p.alive).map(player => { const isSelected = gameState.guardianTargetId === player.id; const isDisabled = player.protectedLastNight; return <button key={player.id} disabled={isDisabled} onClick={() => setGameState(prev => ({ ...prev, guardianTargetId: player.id }))} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isDisabled ? 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed' : isSelected ? 'bg-blue-950/80 border-blue-500 text-blue-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <Shield className="w-4 h-4 text-blue-400 shrink-0" />}</button>; })}
-      </div>
-      <div className="flex gap-3"><button onClick={() => handleSkipNightAction('GUARDIAN', 'Guardian SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={handleConfirmGuardian} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI GUARDIAN</span><ArrowRight className="w-5 h-5" /></button></div>
-    </div>
-  );
-
-  const renderNightSheriff = () => (
-    <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-yellow-950/90 border border-yellow-700/60 text-yellow-300 shadow-lg"><Star className="w-8 h-8" /></div><h2 className="text-2xl font-black text-yellow-300">SHERIFF PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diuji. SKIP tidak menghabiskan kemampuan.</p></div>
-      <button onClick={handleSkipSheriff} className="w-full py-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-white font-black rounded-2xl text-xs transition">SKIP SHERIFF</button>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
-        {getLivingTargets(gameState, 'SHERIFF').map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, sheriffTargetId: p.id }))} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition ${gameState.sheriffTargetId === p.id ? 'bg-yellow-950/80 border-yellow-500 text-yellow-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
-      </div>
-      <button onClick={handleConfirmSheriff} disabled={!gameState.sheriffTargetId} className={`w-full py-4 rounded-2xl font-black text-xs sm:text-sm transition ${gameState.sheriffTargetId ? 'bg-yellow-600 text-slate-950 hover:bg-yellow-500 shadow-xl' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>KONFIRMASI SHERIFF</button>
-    </div>
-  );
-
-  const renderNightDoppelganger = () => (
-    <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-lg"><Ghost className="w-8 h-8" /></div><h2 className="text-2xl font-black text-indigo-300">DOPPELGANGER PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Malam 1: Pilih 1 target hidup.</p></div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
-        {getLivingTargets(gameState, 'DOPPELGANGER').map(p => <button key={p.id} onClick={() => setGameState(prev => ({ ...prev, doppelgangerTargetId: p.id }))} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left ${gameState.doppelgangerTargetId === p.id ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
-      </div>
-      <div className="flex gap-3"><button onClick={() => handleSkipNightAction('DOPPELGANGER', 'Doppelganger SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={handleConfirmDoppelganger} className="w-2/3 py-4 rounded-2xl bg-indigo-700 hover:bg-indigo-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl transition"><span>KONFIRMASI DOPPELGANGER</span><ArrowRight className="w-5 h-5" /></button></div>
-    </div>
-  );
-
-  const renderNightSeer = () => (
-    <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-cyan-950/90 border border-cyan-700/60 text-cyan-400 shadow-lg"><Eye className="w-8 h-8" /></div><h2 className="text-2xl font-black text-cyan-400">SEER PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diramal perannya.</p></div>
-      {!gameState.seerResult && <button onClick={() => handleSkipNightAction('SEER', 'Seer SKIP.')} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition mb-3">SKIP SEER</button>}
-      {gameState.seerResult ? (
-        <div className="bg-gradient-to-br from-cyan-950 via-slate-900 to-cyan-950 border-2 border-cyan-500/80 rounded-3xl p-6 text-center space-y-4 shadow-2xl animate-fadeIn">
-          <span className="text-[10px] font-black text-cyan-300 uppercase tracking-widest">HASIL RAMALAN SEER</span>
-          <div className="space-y-1"><h3 className="text-2xl font-black text-white">{gameState.seerResult.targetName}</h3><div className="inline-block px-4 py-1.5 rounded-full bg-cyan-950 border border-cyan-600/80 text-cyan-300 font-bold text-sm">ROLE: {ROLES[gameState.seerResult.displayedRole]?.name || gameState.seerResult.displayedRole}</div></div>
-          <button onClick={() => advanceNightPhase()} className="w-full py-3.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black text-sm shadow-xl transition">TUTUP HASIL & SELESAI SEER</button>
+  const renderNightGuardian = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-950/90 border border-blue-700/60 text-blue-400 shadow-lg"><Shield className="w-8 h-8" /></div><h2 className="text-2xl font-black text-blue-400">GUARDIAN PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk dilindungi malam ini.</p></div>
+        {actorBanner(actor)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
+          {gameState.players.filter(p => p.alive).map(player => { const isSelected = draft.targetId === player.id; const isDisabled = (gameState.guardianLast || {})[actor?.id] === player.id; return <button key={player.id} disabled={isDisabled} onClick={() => setDraft({ targetId: player.id })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isDisabled ? 'bg-slate-950/60 border-slate-900 text-slate-600 cursor-not-allowed' : isSelected ? 'bg-blue-950/80 border-blue-500 text-blue-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <Shield className="w-4 h-4 text-blue-400 shrink-0" />}</button>; })}
         </div>
-      ) : (
+        <div className="flex gap-3"><button onClick={() => handleSkipNightAction('GUARDIAN', 'Guardian SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={handleConfirmGuardian} disabled={!draft.targetId} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 disabled:opacity-40 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI GUARDIAN</span><ArrowRight className="w-5 h-5" /></button></div>
+      </div>
+    );
+  };
+
+  const renderNightSheriff = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-yellow-950/90 border border-yellow-700/60 text-yellow-300 shadow-lg"><Star className="w-8 h-8" /></div><h2 className="text-2xl font-black text-yellow-300">SHERIFF PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diuji. SKIP tidak menghabiskan kemampuan.</p></div>
+        {actorBanner(actor)}
+        <button onClick={() => handleSkipNightAction('SHERIFF', 'Sheriff SKIP malam ini.')} className="w-full py-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-white font-black rounded-2xl text-xs transition">SKIP SHERIFF</button>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
-          {getLivingTargets(gameState, 'SEER').map(player => <button key={player.id} onClick={() => handleSeerInspect(player.id)} className="p-3.5 rounded-2xl border bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-cyan-950/80 text-xs sm:text-sm font-bold text-left transition flex items-center justify-between"><span className="truncate">{player.name}</span><Eye className="w-4 h-4 text-cyan-400 shrink-0" /></button>)}
+          {getLivingTargets(gameState, 'SHERIFF', actor?.id).map(p => <button key={p.id} onClick={() => setDraft({ targetId: p.id })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition ${draft.targetId === p.id ? 'bg-yellow-950/80 border-yellow-500 text-yellow-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
         </div>
-      )}
-    </div>
-  );
-
-  const renderNightWitch = () => (
-    <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-      <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-950/90 border border-purple-700/60 text-purple-400 shadow-lg"><FlaskConical className="w-8 h-8" /></div><h2 className="text-2xl font-black text-purple-400">WITCH PHASE</h2><p className="text-xs sm:text-sm text-slate-300">{gameState.nightNumber === 1 ? 'Malam 1: Witch hanya bisa menggunakan Heal Potion.' : 'Pilih penggunaan Heal atau Kill Potion secara blind.'}</p></div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-md"><div className="flex items-center justify-between"><span className="font-bold text-emerald-400 text-sm">Heal Potion</span></div><select disabled={gameState.witchHealUsed} value={gameState.witchHealTargetId || ''} onChange={e => setGameState(prev => ({ ...prev, witchHealTargetId: e.target.value || null, witchHealUsedThisNight: !!e.target.value }))} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none"><option value="">-- Tebak Target Heal --</option>{gameState.players.filter(p => p.alive).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-md"><div className="flex items-center justify-between"><span className="font-bold text-purple-400 text-sm">Kill Potion</span></div><select disabled={gameState.witchKillUsed || gameState.nightNumber === 1} value={gameState.witchKillTargetId || ''} onChange={e => setGameState(prev => ({ ...prev, witchKillTargetId: e.target.value || null }))} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none disabled:opacity-40"><option value="">-- Pilih Target Kill --</option>{gameState.players.filter(p => p.alive).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        <button onClick={handleConfirmSheriff} disabled={!draft.targetId} className={`w-full py-4 rounded-2xl font-black text-xs sm:text-sm transition ${draft.targetId ? 'bg-yellow-600 text-slate-950 hover:bg-yellow-500 shadow-xl' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>KONFIRMASI SHERIFF</button>
       </div>
-      <button onClick={() => handleSkipNightAction('WITCH', 'Witch SKIP.')} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition mb-3">SKIP WITCH</button>
-      <button onClick={handleFinishWitch} className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>SELESAIKAN WITCH & PROSES MALAM</span><ArrowRight className="w-5 h-5" /></button>
-    </div>
-  );
+    );
+  };
+
+  const renderNightDoppelganger = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-lg"><Ghost className="w-8 h-8" /></div><h2 className="text-2xl font-black text-indigo-300">DOPPELGANGER PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Malam 1: Pilih 1 target hidup.</p></div>
+        {actorBanner(actor)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
+          {getLivingTargets(gameState, 'DOPPELGANGER', actor?.id).map(p => <button key={p.id} onClick={() => setDraft({ targetId: p.id })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left ${draft.targetId === p.id ? 'bg-indigo-950/80 border-indigo-500 text-indigo-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>{p.name}</button>)}
+        </div>
+        <div className="flex gap-3"><button onClick={() => handleSkipNightAction('DOPPELGANGER', 'Doppelganger SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={handleConfirmDoppelganger} disabled={!draft.targetId} className="w-2/3 py-4 rounded-2xl bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl transition"><span>KONFIRMASI DOPPELGANGER</span><ArrowRight className="w-5 h-5" /></button></div>
+      </div>
+    );
+  };
+
+  const renderNightSeer = () => {
+    const actor = getActor(gameState);
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-cyan-950/90 border border-cyan-700/60 text-cyan-400 shadow-lg"><Eye className="w-8 h-8" /></div><h2 className="text-2xl font-black text-cyan-400">SEER PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain untuk diramal perannya.</p></div>
+        {actorBanner(actor)}
+        {!gameState.seerResult && <button onClick={() => handleSkipNightAction('SEER', 'Seer SKIP.')} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition mb-3">SKIP SEER</button>}
+        {gameState.seerResult ? (
+          <div className="bg-gradient-to-br from-cyan-950 via-slate-900 to-cyan-950 border-2 border-cyan-500/80 rounded-3xl p-6 text-center space-y-4 shadow-2xl animate-fadeIn">
+            <span className="text-[10px] font-black text-cyan-300 uppercase tracking-widest">HASIL RAMALAN SEER</span>
+            <div className="space-y-1"><h3 className="text-2xl font-black text-white">{gameState.seerResult.targetName}</h3><div className="inline-block px-4 py-1.5 rounded-full bg-cyan-950 border border-cyan-600/80 text-cyan-300 font-bold text-sm">ROLE: {ROLES[gameState.seerResult.displayedRole]?.name || gameState.seerResult.displayedRole}</div></div>
+            <button onClick={() => advanceNightPhase({ seerResult: null })} className="w-full py-3.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-black text-sm shadow-xl transition">TUTUP HASIL & SELESAI SEER</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[45vh] overflow-y-auto">
+            {getLivingTargets(gameState, 'SEER', actor?.id).map(player => <button key={player.id} onClick={() => handleSeerInspect(player.id)} className="p-3.5 rounded-2xl border bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-cyan-950/80 text-xs sm:text-sm font-bold text-left transition flex items-center justify-between"><span className="truncate">{player.name}</span><Eye className="w-4 h-4 text-cyan-400 shrink-0" /></button>)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderNightWitch = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    const healUsed = isUsed(gameState, actor?.id, 'WITCH_HEAL');
+    const killUsed = isUsed(gameState, actor?.id, 'WITCH_KILL');
+    const livingList = gameState.players.filter(p => p.alive);
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-950/90 border border-purple-700/60 text-purple-400 shadow-lg"><FlaskConical className="w-8 h-8" /></div><h2 className="text-2xl font-black text-purple-400">WITCH PHASE</h2><p className="text-xs sm:text-sm text-slate-300">{gameState.nightNumber === 1 ? 'Malam 1: Witch hanya bisa menggunakan Heal Potion.' : 'Pilih penggunaan Heal atau Kill Potion secara blind.'}</p></div>
+        {actorBanner(actor)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-md"><div className="flex items-center justify-between"><span className="font-bold text-emerald-400 text-sm">Heal Potion</span>{healUsed && <span className="text-[10px] text-slate-500 font-bold">TERPAKAI</span>}</div><select disabled={healUsed} value={draft.healTargetId || ''} onChange={e => setDraft({ healTargetId: e.target.value || null })} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none disabled:opacity-40"><option value="">-- Tebak Target Heal --</option>{livingList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 space-y-3 shadow-md"><div className="flex items-center justify-between"><span className="font-bold text-purple-400 text-sm">Kill Potion</span>{killUsed && <span className="text-[10px] text-slate-500 font-bold">TERPAKAI</span>}</div><select disabled={killUsed || gameState.nightNumber === 1} value={draft.killTargetId || ''} onChange={e => setDraft({ killTargetId: e.target.value || null })} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none disabled:opacity-40"><option value="">-- Pilih Target Kill --</option>{livingList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        </div>
+        <button onClick={() => handleSkipNightAction('WITCH', 'Witch SKIP.')} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition mb-3">SKIP WITCH</button>
+        <button onClick={handleFinishWitch} className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>SELESAIKAN WITCH</span><ArrowRight className="w-5 h-5" /></button>
+      </div>
+    );
+  };
 
   const renderHunterRevenge = () => (
     <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
@@ -936,7 +972,7 @@ export default function App() {
 
   const handleSaveVotes = () => {
     const livingCount = gameState.players.filter(p => p.alive).length;
-    const { total } = computeVoteCounts({ ...gameState, mayorRevealed: false });
+    const { total } = computeVoteCounts({ ...gameState, mayorRevealedIds: [] });
     if (total > livingCount) { setVoteError(`Total suara (${total}) melebihi jumlah pemain hidup (${livingCount}).`); return; }
     setVoteError('');
     setGameState(prev => ({ ...prev, undoStack: pushUndoState(prev), voteRecorded: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', 'Moderator memasukkan rekapitulasi hasil voting.') }));
@@ -946,8 +982,11 @@ export default function App() {
     const livingPlayers = gameState.players.filter(p => p.alive);
     const hasVotesRecorded = !!gameState.voteRecorded;
     const { counts: voteTally } = computeVoteCounts(gameState);
-    const rawTotal = computeVoteCounts({ ...gameState, mayorRevealed: false }).total;
-    const mayorAlive = gameState.players.some(p => p.role === 'MAYOR' && p.alive);
+    const rawTotal = computeVoteCounts({ ...gameState, mayorRevealedIds: [] }).total;
+    const aliveMayors = gameState.players.filter(p => p.role === 'MAYOR' && p.alive);
+    const revealedMayorIds = gameState.mayorRevealedIds || [];
+    const unrevealedMayors = aliveMayors.filter(m => !revealedMayorIds.includes(m.id));
+    const revealedMayors = aliveMayors.filter(m => revealedMayorIds.includes(m.id));
 
     const sortedCandidates = Object.entries(voteTally)
       .map(([targetId, count]) => ({ player: gameState.players.find(p => p.id === targetId), count }))
@@ -965,22 +1004,22 @@ export default function App() {
           <p className="text-xs text-slate-400">Masukkan jumlah perolehan suara secara langsung untuk masing-masing pemain.</p>
         </div>
 
-        {mayorAlive && !gameState.mayorRevealed && (
-          <button onClick={handleMayorReveal} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm shadow-md transition flex items-center justify-center gap-2">
-            <Crown className="w-4 h-4" /> UNGKAP IDENTITAS MAYOR
+        {unrevealedMayors.map(m => (
+          <button key={m.id} onClick={() => handleMayorReveal(m.id)} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm shadow-md transition flex items-center justify-center gap-2">
+            <Crown className="w-4 h-4" /> UNGKAP IDENTITAS MAYOR ({m.name})
           </button>
-        )}
+        ))}
 
-        {mayorAlive && gameState.mayorRevealed && !hasVotesRecorded && (
-          <div className="bg-slate-900/90 border border-amber-800/60 rounded-2xl p-4 space-y-2">
-            <label className="text-[10px] font-black text-amber-300 uppercase tracking-widest block">Mayor memilih siapa? (bobot 2 suara)</label>
-            <select value={gameState.mayorVoteTargetId || ''} onChange={e => setGameState(prev => ({ ...prev, mayorVoteTargetId: e.target.value || null }))} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none">
+        {!hasVotesRecorded && revealedMayors.map(m => (
+          <div key={m.id} className="bg-slate-900/90 border border-amber-800/60 rounded-2xl p-4 space-y-2">
+            <label className="text-[10px] font-black text-amber-300 uppercase tracking-widest block">Mayor {m.name} memilih siapa? (bobot 2 suara)</label>
+            <select value={(gameState.mayorVotes || {})[m.id] || ''} onChange={e => setGameState(prev => ({ ...prev, mayorVotes: { ...(prev.mayorVotes || {}), [m.id]: e.target.value || null } }))} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none">
               <option value="">-- Mayor skip / tidak memilih --</option>
               {livingPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <p className="text-[10px] text-slate-400">Suara biasa Mayor tetap dihitung di input di bawah; sistem otomatis menambah +1 untuk pilihannya.</p>
           </div>
-        )}
+        ))}
 
         {!hasVotesRecorded ? (
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-4 shadow-xl">
@@ -1057,22 +1096,24 @@ export default function App() {
   };
 
   const renderDoppelgangerReveal = () => {
-    const notice = gameState.doppelgangerRoleChangeNotice;
-    const newMeta = ROLES[notice?.newRole] || ROLES.WARGA;
-    const NewIcon = ROLE_ICONS[notice?.newRole] || Ghost;
+    const notices = gameState.doppelgangerNotices || [];
     return (
       <div className="max-w-md mx-auto p-6 min-h-[70vh] flex flex-col justify-between text-center space-y-6 animate-fadeIn">
         <div className="space-y-4 pt-6">
           <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-2xl"><Ghost className="w-12 h-12" /></div>
           <h2 className="text-2xl font-black text-indigo-300 uppercase tracking-wide">DOPPELGANGER BERUBAH</h2>
           <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Info khusus moderator</p>
-          {notice && (
-            <div className={`rounded-3xl border-2 ${newMeta.border} ${newMeta.bg} p-5 space-y-3`}>
-              <p className="text-sm text-slate-200"><strong>{notice.playerName}</strong> menyalin role dari <strong>{notice.targetName}</strong> yang telah mati.</p>
-              <NewIcon className={`w-12 h-12 mx-auto ${newMeta.color}`} />
-              <p className={`text-xl font-black uppercase ${newMeta.color}`}>{newMeta.name}</p>
-            </div>
-          )}
+          {notices.map(notice => {
+            const newMeta = ROLES[notice.newRole] || ROLES.WARGA;
+            const NewIcon = ROLE_ICONS[notice.newRole] || Ghost;
+            return (
+              <div key={notice.playerId} className={`rounded-3xl border-2 ${newMeta.border} ${newMeta.bg} p-5 space-y-3`}>
+                <p className="text-sm text-slate-200"><strong>{notice.playerName}</strong> menyalin role dari <strong>{notice.targetName}</strong> yang telah mati.</p>
+                <NewIcon className={`w-12 h-12 mx-auto ${newMeta.color}`} />
+                <p className={`text-xl font-black uppercase ${newMeta.color}`}>{newMeta.name}</p>
+              </div>
+            );
+          })}
         </div>
         <button onClick={handleContinueAfterDoppelReveal} className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUTKAN</span><ArrowRight className="w-5 h-5" /></button>
       </div>
@@ -1081,7 +1122,7 @@ export default function App() {
 
   const renderGameOver = () => (
     <div className="max-w-xl mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
-      <div className="space-y-4 pt-4"><div className={`inline-flex items-center justify-center p-5 rounded-3xl border shadow-2xl ${gameState.winner === 'WARGA' ? 'bg-emerald-950/90 border-emerald-600/60 text-emerald-400' : gameState.winner === 'JESTER' ? 'bg-pink-950/90 border-pink-600/60 text-pink-400' : 'bg-red-950/90 border-red-600/60 text-red-400'}`}><Crown className="w-16 h-16 animate-bounce" /></div><h2 className={`text-3xl font-black uppercase tracking-wider ${gameState.winner === 'WARGA' ? 'text-emerald-400' : gameState.winner === 'JESTER' ? 'text-pink-400' : 'text-red-400'}`}>{gameState.winner === 'WARGA' ? 'TIM WARGA MENANG' : gameState.winner === 'JESTER' ? 'JESTER MENANG' : 'TIM WEREWOLF MENANG'}</h2></div>
+      <div className="space-y-4 pt-4"><div className={`inline-flex items-center justify-center p-5 rounded-3xl border shadow-2xl ${gameState.winner === 'WARGA' ? 'bg-emerald-950/90 border-emerald-600/60 text-emerald-400' : (gameState.winner === 'JESTER' || gameState.winner === 'LOVERS') ? 'bg-pink-950/90 border-pink-600/60 text-pink-400' : 'bg-red-950/90 border-red-600/60 text-red-400'}`}><Crown className="w-16 h-16 animate-bounce" /></div><h2 className={`text-3xl font-black uppercase tracking-wider ${gameState.winner === 'WARGA' ? 'text-emerald-400' : (gameState.winner === 'JESTER' || gameState.winner === 'LOVERS') ? 'text-pink-400' : 'text-red-400'}`}>{gameState.winner === 'WARGA' ? 'TIM WARGA MENANG' : gameState.winner === 'JESTER' ? 'JESTER MENANG' : gameState.winner === 'LOVERS' ? 'LOVERS MENANG' : 'TIM WEREWOLF MENANG'}</h2></div>
       
       <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 sm:p-8 shadow-2xl text-left">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Ringkasan Peran Akhir</h3>
@@ -1220,7 +1261,7 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-700/80 w-full max-w-2xl max-h-[85vh] rounded-3xl flex flex-col shadow-2xl">
             <div className="p-5 border-b border-slate-800 flex items-center justify-between"><div className="flex items-center gap-2 text-amber-400 font-bold text-base"><BookOpen className="w-5 h-5" /><span>Panduan Aturan Werewolf</span></div><button onClick={() => setShowRulesModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"><X className="w-5 h-5" /></button></div>
             <div className="p-5 overflow-y-auto space-y-4 text-sm text-slate-300">
-              <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2"><h4 className="font-bold text-amber-300 text-sm flex items-center gap-2"><Crown className="w-4 h-4" /> Tujuan Permainan</h4><p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil.</p><p>• <strong>Tim Werewolf:</strong> Menang jika jumlah Werewolf lebih banyak atau sama dengan dari jumlah pemain non-Evil.</p></section>
+              <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2"><h4 className="font-bold text-amber-300 text-sm flex items-center gap-2"><Crown className="w-4 h-4" /> Tujuan Permainan</h4><p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil.</p><p>• <strong>Tim Werewolf:</strong> Menang jika jumlah Werewolf lebih banyak atau sama dengan dari jumlah pemain non-Evil.</p><p>• <strong>Lovers beda tim:</strong> Jika pasangan Lovers terdiri dari Werewolf dan non-Werewolf, mereka menang bersama bila hanya mereka berdua yang tersisa.</p></section>
               <section className="space-y-2.5"><h4 className="font-bold text-white text-sm">Aturan Peran</h4>{Object.entries(ROLES).map(([key, role]) => { const Icon = ROLE_ICONS[key] || User; return <div key={key} className={`p-3 rounded-2xl border ${role.border} ${role.bg} flex items-start gap-3 shadow-md`}><Icon className={`w-6 h-6 ${role.color} mt-1`} /><div><span className={`font-black ${role.color}`}>{role.name} ({role.team})</span><p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{role.desc}</p></div></div>; })}</section>
             </div>
           </div>
