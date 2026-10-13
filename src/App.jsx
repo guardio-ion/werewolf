@@ -33,6 +33,7 @@ export default function App() {
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
   const [showDashboardDrawer, setShowDashboardDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showRoleCheckModal, setShowRoleCheckModal] = useState(false); // Modal cek role untuk moderator
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [participantSearch, setParticipantSearch] = useState('');
@@ -56,8 +57,6 @@ export default function App() {
     localStorage.setItem('werewolf_mod_notes', modNotes);
   }, [modNotes]);
 
-  // Hard-disable browser Text-to-Speech.
-  // The game itself does not use audio, so any queued speech must be cancelled.
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -116,47 +115,64 @@ export default function App() {
     return { valid: true };
   };
 
+  // Perbaikan urutan dan fleksibilitas transisi fase malam agar role kompleks tidak saling menimpa/hilang
   const advanceNightPhase = (overrides = {}, options = {}) => {
     setGameState(prev => {
       if (prev.currentPhase === 'GAME_OVER') return prev;
       const state = { ...prev, ...overrides };
-      const canContinueFrom = (...phases) => phases.includes(state.currentPhase);
       const commit = options.recordUndo ? { ...state, undoStack: pushUndoState(prev) } : state;
 
-      if (state.nightNumber === 1 && state.players.some(p => p.role === 'CUPID' && p.alive) && !state.cupidUsed && !state.nightSkips?.CUPID && state.currentPhase === 'NIGHT_INTRO') {
+      // 1. Cupid (Malam 1)
+      if (state.nightNumber === 1 && state.players.some(p => p.role === 'CUPID' && p.alive) && !state.cupidUsed && !state.nightSkips?.CUPID && !state.cupidResolved) {
         return { ...commit, currentPhase: 'NIGHT_CUPID' };
       }
+
+      // 2. Doppelganger (Malam 1)
       const doppel = state.players.find(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied);
       const doppelTargets = getLivingTargets(state, 'DOPPELGANGER');
-      if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF')) {
+      if (doppel && state.nightNumber === 1 && !state.doppelgangerTargetId && !state.nightSkips?.DOPPELGANGER && doppelTargets.length > 0) {
         return { ...commit, currentPhase: 'NIGHT_DOPPELGANGER' };
       }
+
+      // 3. Werewolf
       const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
-      if (livingWerewolves.length > 0 && wolfTargets.length > 0 && !state.werewolfTargetIds?.length && !state.nightSkips?.WEREWOLF && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF')) {
+      const requiredWolfTargets = state.wolfCubRagePending ? 2 : 1;
+      const currentWolfCount = (state.werewolfTargetIds || []).length || (state.werewolfTargetId ? 1 : 0);
+      if (livingWerewolves.length > 0 && wolfTargets.length > 0 && currentWolfCount < requiredWolfTargets && !state.nightSkips?.WEREWOLF) {
         return { ...commit, currentPhase: 'NIGHT_WEREWOLF' };
       }
+
+      // 4. Guardian
       const guardian = state.players.find(p => p.role === 'GUARDIAN' && p.alive);
       const guardianTargets = getLivingTargets(state, 'GUARDIAN');
-      if (guardian && guardianTargets.length > 0 && !state.guardianTargetId && !state.nightSkips?.GUARDIAN && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
+      if (guardian && guardianTargets.length > 0 && !state.guardianTargetId && !state.nightSkips?.GUARDIAN) {
         return { ...commit, currentPhase: 'NIGHT_GUARDIAN' };
       }
+
+      // 5. Sheriff (Malam > 1)
       const sheriff = state.players.find(p => p.role === 'SHERIFF' && p.alive);
       const sheriffTargets = getLivingTargets(state, 'SHERIFF');
-      if (sheriff && state.nightNumber > 1 && !state.sheriffResolved && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0 && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN')) {
+      if (sheriff && state.nightNumber > 1 && !state.sheriffResolved && !state.nightSkips?.SHERIFF && sheriffTargets.length > 0) {
         return { ...commit, currentPhase: 'NIGHT_SHERIFF' };
       }
+
+      // 6. Seer
       const seer = state.players.find(p => p.role === 'SEER' && p.alive);
       const seerTargets = getLivingTargets(state, 'SEER');
-      if (seer && seerTargets.length > 0 && !state.seerTargetId && !state.nightSkips?.SEER && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
+      if (seer && seerTargets.length > 0 && !state.seerTargetId && !state.nightSkips?.SEER) {
         return { ...commit, currentPhase: 'NIGHT_SEER' };
       }
+
+      // 7. Witch
       const witch = state.players.find(p => p.role === 'WITCH' && p.alive);
       const witchTargets = getLivingTargets(state, 'WITCH');
       const witchCanKill = state.nightNumber > 1; 
-      if (witch && witchTargets.length > 0 && !state.nightSkips?.WITCH && (!state.witchHealUsed || (!state.witchKillUsed && witchCanKill)) && canContinueFrom('NIGHT_INTRO', 'NIGHT_CUPID', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_SHERIFF', 'NIGHT_DOPPELGANGER', 'NIGHT_SEER')) {
+      if (witch && witchTargets.length > 0 && !state.nightSkips?.WITCH && (!state.witchHealUsed || (!state.witchKillUsed && witchCanKill))) {
         return { ...commit, currentPhase: 'NIGHT_WITCH' };
       }
+
+      // Jika semua aksi malam selesai, eksekusi malam
       return resolveNightActions(commit);
     });
   };
@@ -228,7 +244,7 @@ export default function App() {
 
     let tempState = {
       ...state, players: updatedPlayers, gameLog: log, lastNightDeaths: nightDeathsList,
-      wolfCubRagePending: state.wolfCubRagePending || nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
+      wolfCubRagePending: nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
       hunterPending: nightDeathsList.some(d => d.player.role === 'HUNTER' && !d.player.hunterRevengeUsed), loverDeathNotice, doppelgangerRoleChangeNotice,
       werewolfTargetId: null, werewolfTargetIds: [], guardianTargetId: null, sheriffTargetId: null, seerTargetId: null, seerResult: null,
       witchHealUsedThisNight: false, witchHealTargetId: null, witchKillTargetId: null, hunterTargetId: null, nightSkips: {},
@@ -282,7 +298,7 @@ export default function App() {
     const p1 = players.find(p => p.id === cupidLover1Id), p2 = players.find(p => p.id === cupidLover2Id);
     if (!p1?.alive || !p2?.alive) return;
     const updatedPlayers = players.map(p => p.id === cupidLover1Id ? { ...p, loverId: cupidLover2Id } : p.id === cupidLover2Id ? { ...p, loverId: cupidLover1Id } : p);
-    advanceNightPhase({ players: updatedPlayers, cupidUsed: true, gameLog: addLog(gameState.gameLog, nightNumber, dayNumber, 'ACTION', `Cupid memilih ${p1.name} & ${p2.name}.`) }, { recordUndo: true });
+    advanceNightPhase({ players: updatedPlayers, cupidUsed: true, cupidResolved: true, gameLog: addLog(gameState.gameLog, nightNumber, dayNumber, 'ACTION', `Cupid memilih ${p1.name} & ${p2.name}.`) }, { recordUndo: true });
   };
 
   const handleConfirmDoppelganger = () => {
@@ -306,7 +322,7 @@ export default function App() {
   const handleConfirmWerewolf = (selectedIds) => {
     const required = gameState.wolfCubRagePending ? 2 : 1;
     if (!selectedIds || selectedIds.length !== required) return;
-    advanceNightPhase({ werewolfTargetIds: [...selectedIds], werewolfTargetId: selectedIds[0] || null, wolfCubRagePending: false, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Werewolf mengunci target.`) }, { recordUndo: true });
+    advanceNightPhase({ werewolfTargetIds: [...selectedIds], werewolfTargetId: selectedIds[0] || null, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Werewolf mengunci target.`) }, { recordUndo: true });
   };
 
   const handleConfirmGuardian = () => {
@@ -323,7 +339,7 @@ export default function App() {
   const handleSkipNightAction = (roleKey, message) => {
     const cleared = { nightSkips: { ...(gameState.nightSkips || {}), [roleKey]: true }, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'INFO', message) };
     switch (roleKey) {
-      case 'CUPID': cleared.cupidLover1Id = null; cleared.cupidLover2Id = null; break;
+      case 'CUPID': cleared.cupidLover1Id = null; cleared.cupidLover2Id = null; cleared.cupidResolved = true; break;
       case 'WEREWOLF': cleared.werewolfTargetId = null; cleared.werewolfTargetIds = []; break;
       case 'GUARDIAN': cleared.guardianTargetId = null; break;
       case 'DOPPELGANGER': cleared.doppelgangerTargetId = null; break;
@@ -698,11 +714,38 @@ export default function App() {
     const selectedIds = gameState.werewolfTargetIds || (gameState.werewolfTargetId ? [gameState.werewolfTargetId] : []);
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg"><PawPrint className="w-8 h-8" /></div><h2 className="text-2xl font-black text-red-400">WEREWOLF PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih {rage ? '2 pemain' : '1 pemain'} untuk dieliminasi.</p></div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
-          {livingCandidates.map(player => { const isSelected = selectedIds.includes(player.id); return <button key={player.id} onClick={() => setGameState(prev => { const current = prev.werewolfTargetIds || []; if (rage) { const next = current.includes(player.id) ? current.filter(x => x !== player.id) : current.length < 2 ? [...current, player.id] : [current[1], player.id]; return { ...prev, werewolfTargetIds: next, werewolfTargetId: next[0] || null }; } return { ...prev, werewolfTargetIds: [player.id], werewolfTargetId: player.id }; })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-red-950/80 border-red-500 text-red-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <Crosshair className="w-4 h-4 text-red-400 shrink-0" />}</button>; })}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg"><PawPrint className="w-8 h-8" /></div>
+          <h2 className="text-2xl font-black text-red-400">WEREWOLF PHASE</h2>
+          {rage && (
+            <div className="inline-block px-3 py-1 bg-red-600 text-white font-black text-xs rounded-full animate-bounce shadow-md my-1">
+              🐺 WOLF CUB RAGE! (PILIH 2 KORBAN)
+            </div>
+          )}
+          <p className="text-xs sm:text-sm text-slate-300">Pilih {rage ? '2 pemain' : '1 pemain'} untuk dieliminasi.</p>
         </div>
-        <div className="flex gap-3"><button onClick={() => handleSkipNightAction('WEREWOLF', 'Werewolf SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={() => handleConfirmWerewolf(selectedIds)} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI TARGET</span><ArrowRight className="w-5 h-5" /></button></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
+          {livingCandidates.map(player => { 
+            const isSelected = selectedIds.includes(player.id); 
+            return (
+              <button key={player.id} onClick={() => setGameState(prev => { 
+                const current = prev.werewolfTargetIds || []; 
+                if (rage) { 
+                  const next = current.includes(player.id) ? current.filter(x => x !== player.id) : current.length < 2 ? [...current, player.id] : [current[1], player.id]; 
+                  return { ...prev, werewolfTargetIds: next, werewolfTargetId: next[0] || null }; 
+                } 
+                return { ...prev, werewolfTargetIds: [player.id], werewolfTargetId: player.id }; 
+              })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-red-950/80 border-red-500 text-red-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>
+                <span className="truncate">{player.name}</span>
+                {isSelected && <Crosshair className="w-4 h-4 text-red-400 shrink-0" />}
+              </button>
+            ); 
+          })}
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => handleSkipNightAction('WEREWOLF', 'Werewolf SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button>
+          <button onClick={() => handleConfirmWerewolf(selectedIds)} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI TARGET</span><ArrowRight className="w-5 h-5" /></button>
+        </div>
       </div>
     );
   };
@@ -905,8 +948,16 @@ export default function App() {
       {gameState.currentPhase !== 'HOME' && gameState.currentPhase !== 'SETUP' && (
         <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 shadow-md">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2"><div className="flex items-center gap-1.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs font-bold text-white shadow-sm"><Moon className="w-4 h-4 text-indigo-400" /><span>MALAM {gameState.nightNumber}</span></div></div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700/80 text-xs font-bold text-white shadow-sm">
+                <Moon className="w-4 h-4 text-indigo-400" /><span>MALAM {gameState.nightNumber}</span>
+              </div>
+            </div>
             <div className="flex items-center gap-1.5">
+              {/* Tombol Moderator Cek Role di Bagian Atas */}
+              <button onClick={() => setShowRoleCheckModal(true)} className="px-3 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 border border-amber-500 text-slate-950 font-black text-xs flex items-center gap-1.5 transition shadow-sm" title="Cek Role Pemain">
+                <Eye className="w-4 h-4" /><span>Cek Role</span>
+              </button>
               <button onClick={() => setPrivacyMode(prev => !prev)} className={`p-2 rounded-xl border transition ${privacyMode ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-800/90 hover:bg-slate-700 border-slate-700/80 text-amber-300'}`} title="Privacy Mode">{privacyMode ? <Unlock className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
               <button onClick={handleBackToHome} className="p-2 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-800/80 text-red-300 transition" title="Kembali ke Home"><Home className="w-4 h-4" /></button>
               {gameState.undoStack && gameState.undoStack.length > 0 && <button onClick={handleUndo} className="p-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-amber-400 transition" title="Undo"><CornerUpLeft className="w-4 h-4" /></button>}
@@ -930,6 +981,36 @@ export default function App() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-900 border border-slate-700 text-amber-400 shadow-2xl"><EyeOff className="w-10 h-10" /></div>
             <div><div className="text-[10px] font-black tracking-[0.25em] text-amber-400 uppercase">PRIVACY MODE</div><h2 className="text-2xl font-black text-white mt-2">INFORMASI RAHASIA TERSEMBUNYI</h2><p className="text-sm text-slate-400 mt-2">Layar aman untuk diperlihatkan kepada pemain.</p></div>
             <button onClick={() => setPrivacyMode(false)} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-xl">KELUAR PRIVACY MODE</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cek Role Khusus Moderator */}
+      {showRoleCheckModal && (
+        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-lg max-h-[80vh] rounded-3xl flex flex-col shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-base"><Eye className="w-5 h-5" /><span>Daftar Role Pemain (Moderator View)</span></div>
+              <button onClick={() => setShowRoleCheckModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-2.5 flex-1">
+              {gameState.players.map(p => {
+                const meta = ROLES[p.role] || ROLES.WARGA;
+                const Icon = ROLE_ICONS[p.role] || User;
+                return (
+                  <div key={p.id} className={`p-3 rounded-2xl border ${p.alive ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-950/30 border-slate-900 opacity-60'} flex items-center justify-between`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.bg} border ${meta.border}`}><Icon className={`w-4 h-4 ${meta.color}`} /></div>
+                      <div><h4 className="font-bold text-white text-sm">{p.name}</h4><span className={`text-[10px] font-black ${meta.color}`}>{meta.name}</span></div>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${p.alive ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-red-950/80 text-red-400 border-red-900'}`}>{p.alive ? 'Hidup' : 'Mati'}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t border-slate-800 text-center">
+              <button onClick={() => setShowRoleCheckModal(false)} className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-lg">TUTUP</button>
+            </div>
           </div>
         </div>
       )}
