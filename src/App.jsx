@@ -82,7 +82,6 @@ export default function App() {
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRoleCheckModal, setShowRoleCheckModal] = useState(false); 
-  const [showModNote, setShowModNote] = useState(false);
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [participantSearch, setParticipantSearch] = useState('');
@@ -137,9 +136,6 @@ export default function App() {
     tick();
     return () => clearInterval(interval);
   }, [gameState.currentPhase, gameState.discussionEndTimestamp, gameState.isTimerPaused, gameState.pausedRemainingSeconds, gameState.discussionDurationSeconds]);
-
-  // Catatan moderator selalu tertutup saat berganti fase / aktor
-  useEffect(() => { setShowModNote(false); }, [gameState.currentPhase, gameState.nightActorId]);
 
   // Fase palsu: tampil seperti fase role biasa, lanjut otomatis setelah jeda acak.
   useEffect(() => {
@@ -973,12 +969,13 @@ export default function App() {
     );
   };
 
-  // Catatan khusus moderator untuk fase aktor malam. Tombol "i" selalu ada di setiap fase aktor
-  // dengan tampilan yang sama; isinya baru muncul saat diketuk, jadi tidak membocorkan apa pun.
+  // Banner untuk moderator di fase aktor malam: blokir Illusionist & Gerhana.
+  // Web ini hanya dipegang moderator, jadi banner langsung tampil (hanya bila ada yang perlu diingat).
   const MOD_NOTE_PHASES = ['NIGHT_ILLUSIONIST', 'NIGHT_CUPID', 'NIGHT_DOPPELGANGER', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_BODYGUARD', 'NIGHT_SHERIFF', 'NIGHT_SEER', 'NIGHT_WITCH'];
   const moderatorNotes = (state) => {
     const notes = [];
     const phase = state.currentPhase;
+    if (!MOD_NOTE_PHASES.includes(phase)) return notes;
     if (phase === 'NIGHT_WEREWOLF') {
       if ((state.players || []).some(p => p.alive && isBlocked(state, p.id) && canAttackAsWolf(p))) notes.push('⚠ Pack Werewolf diblokir Illusionist: serangan / penularan malam ini tidak berefek. Jalankan fase seperti biasa.');
     } else {
@@ -986,19 +983,17 @@ export default function App() {
       if (actor && isBlocked(state, actor.id)) notes.push(`⚠ ${actor.name} diblokir Illusionist: aksinya tidak berefek${phase === 'NIGHT_SEER' ? ' (hasil ramalan diacak sistem)' : ''}. Jangan beri tahu pemainnya.`);
     }
     if (phase === 'NIGHT_SEER' && isEventTonight(state, 'ECLIPSE')) notes.push('🌘 Gerhana: hasil ramalan diacak oleh sistem (Werewolf / Warga, 50:50).');
-    return notes.length ? notes : ['Tidak ada gangguan: aksi berjalan normal.'];
+    return notes;
   };
-  const renderModeratorNote = () => {
-    if (!MOD_NOTE_PHASES.includes(gameState.currentPhase)) return null;
+  const renderModeratorBanner = () => {
+    const notes = moderatorNotes(gameState);
+    if (notes.length === 0) return null;
     return (
-      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
-        {showModNote && (
-          <div className="max-w-[16rem] rounded-2xl border border-amber-700/60 bg-slate-900/95 p-3 shadow-xl space-y-1 animate-fadeIn">
-            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Catatan moderator</p>
-            {moderatorNotes(gameState).map((n, i) => <p key={i} className="text-xs text-slate-200 leading-relaxed">{n}</p>)}
-          </div>
-        )}
-        <button onClick={() => setShowModNote(v => !v)} aria-label="Catatan moderator" className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400 text-sm font-black hover:bg-slate-700 transition">i</button>
+      <div className="max-w-lg mx-auto px-4 sm:px-6 pt-4">
+        <div className="rounded-2xl border border-amber-600/60 bg-amber-950/40 p-3 space-y-1 animate-fadeIn">
+          <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Catatan moderator</p>
+          {notes.map((n, i) => <p key={i} className="text-xs text-amber-100 leading-relaxed">{n}</p>)}
+        </div>
       </div>
     );
   };
@@ -1536,9 +1531,9 @@ export default function App() {
       {renderSmartAssistant()}
       
       <main key={`${gameState.currentPhase}-${gameState.nightNumber}-${gameState.dayNumber}`} className="flex-1 pb-8">
+        {renderModeratorBanner()}
         {renderCurrentPhase()}
       </main>
-      {renderModeratorNote()}
 
       {showRoleCheckModal && (
         <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
