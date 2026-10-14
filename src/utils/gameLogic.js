@@ -10,10 +10,16 @@ export function isWolfAligned(player) {
         player.role === 'WEREWOLF' ||
         player.role === 'WOLF_CUB' ||
         player.role === 'ALPHA_WOLF' ||
+        player.role === 'ILLUSIONIST' ||
         // Traitor yang berubah, pemain yang ditulari Alpha Wolf
         player.convertedToWerewolf
       )
   );
+}
+
+/** Evil yang ikut menyerang malam hari (Illusionist tim Evil tetapi tidak menyerang). */
+export function canAttackAsWolf(player) {
+  return isWolfAligned(player) && player.role !== 'ILLUSIONIST';
 }
 
 export function getEffectiveTeam(player) {
@@ -24,7 +30,8 @@ export function getEffectiveTeam(player) {
   if (
     player.role === 'WEREWOLF' ||
     player.role === 'WOLF_CUB' ||
-    player.role === 'ALPHA_WOLF'
+    player.role === 'ALPHA_WOLF' ||
+    player.role === 'ILLUSIONIST'
   ) {
     return 'Evil';
   }
