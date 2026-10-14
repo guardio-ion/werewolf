@@ -4,7 +4,7 @@ import {
   Heart, Skull, Users, History, BookOpen, X,
   Crown, Play, Pause, HelpCircle, Sparkles, ArrowRight, CornerUpLeft,
   Check, RefreshCw, User, PawPrint, Swords, Star, 
-  MessageSquare, CheckSquare, Ghost, ShieldCheck, Delete
+  MessageSquare, CheckSquare, Ghost, ShieldCheck
 } from 'lucide-react';
 
 import { ROLES, ROLE_KEYS } from './constants/roles';
@@ -30,7 +30,38 @@ const DEATH_REASON_LABELS = {
 // Jeda fase palsu: 6–15 detik (acak aman), supaya terasa seperti fase sungguhan.
 const FAKE_PHASE_MIN_MS = 6000;
 const FAKE_PHASE_SPREAD_MS = 9000;
-const PIN_LENGTH = 4;
+
+// Animasi ringan (singkat, tidak menghalangi interaksi, menghormati reduced-motion).
+const APP_STYLES = `
+.wf-blob{transition:background-color 1.4s ease}
+.wf-app[data-tone="night"] .wf-blob-a{background-color:rgba(49,46,129,.22)}
+.wf-app[data-tone="night"] .wf-blob-b{background-color:rgba(69,10,10,.18)}
+.wf-app[data-tone="day"] .wf-blob-a{background-color:rgba(180,83,9,.16)}
+.wf-app[data-tone="day"] .wf-blob-b{background-color:rgba(146,64,14,.12)}
+.wf-app[data-tone="good"] .wf-blob-a{background-color:rgba(5,150,105,.18)}
+.wf-app[data-tone="good"] .wf-blob-b{background-color:rgba(6,95,70,.14)}
+.wf-app[data-tone="evil"] .wf-blob-a{background-color:rgba(153,27,27,.22)}
+.wf-app[data-tone="evil"] .wf-blob-b{background-color:rgba(127,29,29,.18)}
+@keyframes wfPop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.wf-pop{animation:wfPop 140ms ease-out both}
+@keyframes wfRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.wf-stagger>*{animation:wfRise 320ms ease-out both}
+.wf-stagger>*:nth-child(2){animation-delay:120ms}
+.wf-stagger>*:nth-child(3){animation-delay:240ms}
+.wf-stagger>*:nth-child(4){animation-delay:360ms}
+.wf-stagger>*:nth-child(n+5){animation-delay:480ms}
+@keyframes wfGlow{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,0)}50%{box-shadow:0 0 28px 2px rgba(248,113,113,.25)}}
+.wf-glow{animation:wfGlow 4.5s ease-in-out infinite}
+.wf-app button:not(:disabled){transition-property:background-color,border-color,opacity,transform,box-shadow}
+.wf-app button:not(:disabled):active{transform:scale(.98)}
+@media (prefers-reduced-motion:reduce){.wf-pop,.wf-stagger>*,.wf-glow{animation:none!important}.wf-blob{transition:none}}
+`;
+
+function toneForPhase(phase, winner) {
+  if (phase === 'MORNING' || phase === 'DISCUSSION' || phase === 'VOTING') return 'day';
+  if (phase === 'GAME_OVER') return winner === 'WEREWOLF' ? 'evil' : 'good';
+  return 'night';
+}
 
 export default function App() {
   const [gameState, setGameState] = useState(() => {
@@ -52,14 +83,9 @@ export default function App() {
   const [remainingSeconds, setRemainingSeconds] = useState(300);
   const [voteError, setVoteError] = useState('');
   const [fakeDraft, setFakeDraft] = useState(true);
-  const [pinDraft, setPinDraft] = useState(false);
   // Role reveal: semua state lokal (tidak disimpan ke localStorage) agar kartu tidak bocor saat reload.
   const [isHolding, setIsHolding] = useState(false);
   const [viewedIndex, setViewedIndex] = useState(null);
-  const [pinUnlocked, setPinUnlocked] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-  const rolePinsRef = useRef({});
   const wasHoldingRef = useRef(false);
   const [fakeNow, setFakeNow] = useState(Date.now());
 
@@ -110,15 +136,14 @@ export default function App() {
   // Reset seluruh state pembuka role saat pindah pemain / keluar dari fase reveal.
   useEffect(() => {
     wasHoldingRef.current = false;
-    setIsHolding(false); setPinUnlocked(false); setPinInput(''); setPinError('');
-    if (gameState.currentPhase !== 'ROLE_REVEAL') { rolePinsRef.current = {}; setViewedIndex(null); }
+    setIsHolding(false);
+    if (gameState.currentPhase !== 'ROLE_REVEAL') setViewedIndex(null);
   }, [gameState.currentPhase, gameState.revealPlayerIndex]);
 
-  // Saat kartu dilepas: tandai sudah dilihat; dengan PIN aktif, kunci lagi.
+  // Saat kartu dilepas: tandai role sudah dilihat.
   useEffect(() => {
     if (wasHoldingRef.current && !isHolding) {
       setViewedIndex(gameState.revealPlayerIndex);
-      if (gameState.rolePinEnabled) setPinUnlocked(false);
     }
     wasHoldingRef.current = isHolding;
   }, [isHolding]);
@@ -644,7 +669,7 @@ export default function App() {
     const shuffledRoles = shuffle(roleList);
     const stamp = Date.now();
     const newPlayers = playerNames.map((name, idx) => ({ id: 'player_' + (idx + 1) + '_' + stamp, name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false, convertedToWerewolf: false }));
-    setGameState({ ...createInitialGameState(), players: newPlayers, roleCounts: { ...roleCounts }, fakePhasesEnabled: gameState.fakePhasesEnabled !== false, rolePinEnabled: !!gameState.rolePinEnabled, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
+    setGameState({ ...createInitialGameState(), players: newPlayers, roleCounts: { ...roleCounts }, fakePhasesEnabled: gameState.fakePhasesEnabled !== false, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
   };
 
   const handleBackToHome = () => {
@@ -695,7 +720,7 @@ export default function App() {
     <div className="min-h-[85vh] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
       <div className="max-w-md w-full space-y-8">
         <div className="space-y-4">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl wf-glow">
             <Moon className="w-12 h-12 text-red-400" />
           </div>
           <h1 className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase">WEREWOLF</h1>
@@ -794,10 +819,6 @@ export default function App() {
           <input type="checkbox" checked={fakeDraft} onChange={e => setFakeDraft(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-500" />
           <span><span className="block text-sm font-bold text-white">Fase palsu</span><span className="block text-[11px] text-slate-400">Role yang sudah mati / kemampuannya habis tetap "dipanggil" dengan jeda acak, jadi pemain tidak bisa menebak dari jeda.</span></span>
         </label>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input type="checkbox" checked={pinDraft} onChange={e => setPinDraft(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-500" />
-          <span><span className="block text-sm font-bold text-white">PIN pembuka role</span><span className="block text-[11px] text-slate-400">Tiap pemain membuat PIN 4 digit sendiri; melihat role lagi (selama gilirannya) harus memasukkan PIN.</span></span>
-        </label>
       </div>
       {setupIssues.length > 0 && (
         <div className="rounded-2xl border border-red-800/60 bg-red-950/40 p-3 space-y-1">
@@ -819,7 +840,7 @@ export default function App() {
           const roleList = Object.entries(roleCountsDraft).flatMap(([role, count]) => Array(Number(count)).fill(role));
           const shuffledRoles = shuffle(roleList);
           const players = trimmed.map((name, idx) => ({ id: 'player_' + (idx + 1) + '_' + Date.now(), name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false, convertedToWerewolf: false }));
-          setGameState({ ...createInitialGameState(), players, currentPhase: 'ROLE_SUMMARY', roleCounts: { ...roleCountsDraft }, fakePhasesEnabled: fakeDraft, rolePinEnabled: pinDraft, gameLog: addLog([], 1, 1, 'INFO', `Permainan dibuat dengan ${playerCount} pemain.`) });
+          setGameState({ ...createInitialGameState(), players, currentPhase: 'ROLE_SUMMARY', roleCounts: { ...roleCountsDraft }, fakePhasesEnabled: fakeDraft, gameLog: addLog([], 1, 1, 'INFO', `Permainan dibuat dengan ${playerCount} pemain.`) });
         }} disabled={!canStart} className="w-2/3 py-3.5 disabled:opacity-40 disabled:cursor-not-allowed rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition">
           <Sparkles className="w-5 h-5" /><span>ACAK ROLE</span>
         </button>
@@ -855,20 +876,7 @@ export default function App() {
     if (!currentPlayer) return null;
     const roleMeta = ROLES[currentPlayer.role] || ROLES.WARGA;
     const Icon = ROLE_ICONS[currentPlayer.role] || User;
-    const pinOn = !!gameState.rolePinEnabled;
-    const savedPin = rolePinsRef.current[currentPlayer.id];
-    const gated = pinOn && !pinUnlocked;
     const hasViewed = viewedIndex === revealPlayerIndex;
-
-    const handlePinDigit = (digit) => {
-      if (pinInput.length >= PIN_LENGTH) return;
-      const next = pinInput + digit;
-      setPinError('');
-      if (next.length < PIN_LENGTH) { setPinInput(next); return; }
-      setPinInput('');
-      if (!savedPin) { rolePinsRef.current[currentPlayer.id] = next; setPinUnlocked(true); return; }
-      if (savedPin === next) setPinUnlocked(true); else setPinError('PIN salah, coba lagi.');
-    };
 
     const holdProps = {
       role: 'button', tabIndex: 0, 'aria-label': 'Tahan untuk melihat role',
@@ -888,44 +896,26 @@ export default function App() {
       <div className="max-w-md mx-auto p-4 sm:p-6 min-h-[80vh] flex flex-col justify-between space-y-6 animate-fadeIn">
         <div className="text-center space-y-1"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PEMBAGIAN ROLE ({revealPlayerIndex + 1} / {players.length})</span><h2 className="text-3xl font-black text-white">{currentPlayer.name}</h2><p className="text-xs text-amber-300">Serahkan perangkat hanya kepada {currentPlayer.name}.</p></div>
         <div className="flex-1 flex flex-col items-center justify-center my-4 gap-4">
-          {gated ? (
-            <div className="w-full max-w-xs rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 p-5 text-center space-y-4 shadow-2xl">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-950 flex items-center justify-center border border-slate-800"><Lock className="w-7 h-7 text-amber-400" /></div>
-              <div>
-                <h3 className="text-base font-bold text-white">{savedPin ? 'MASUKKAN PIN' : 'BUAT PIN 4 DIGIT'}</h3>
-                <p className="text-[11px] text-slate-400 mt-1">{savedPin ? 'PIN yang kamu buat tadi.' : 'Ingat PIN ini; dipakai jika ingin melihat role lagi.'}</p>
+          <div {...holdProps} className="w-full max-w-xs aspect-[3/4] select-none outline-none cursor-pointer">
+            {!isHolding ? (
+              <div className="w-full h-full rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 flex flex-col items-center justify-center p-6 text-center shadow-2xl hover:border-amber-400 transition">
+                <div className="w-20 h-20 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 mb-4"><Lock className="w-10 h-10 text-amber-400" /></div>
+                <h3 className="text-base font-bold text-white mb-1">ROLE RAHASIA</h3><p className="text-xs text-slate-400">{hasViewed ? 'Tahan lagi untuk melihat. ' : ''}Tahan kartu ini untuk melihat role. Lepas untuk menutup.</p>
               </div>
-              <div className="flex justify-center gap-2">{Array.from({ length: PIN_LENGTH }).map((_, i) => <span key={i} className={`w-3.5 h-3.5 rounded-full border ${i < pinInput.length ? 'bg-amber-400 border-amber-300' : 'border-slate-600'}`} />)}</div>
-              {pinError && <p className="text-xs font-bold text-red-400">{pinError}</p>}
-              <div className="grid grid-cols-3 gap-2">
-                {['1','2','3','4','5','6','7','8','9'].map(d => <button key={d} onClick={() => handlePinDigit(d)} className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-lg transition">{d}</button>)}
-                <span />
-                <button onClick={() => handlePinDigit('0')} className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-lg transition">0</button>
-                <button onClick={() => { setPinError(''); setPinInput(v => v.slice(0, -1)); }} aria-label="Hapus" className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition"><Delete className="w-5 h-5" /></button>
+            ) : (
+              <div className={`wf-pop w-full h-full rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl`}>
+                <div className="space-y-3"><Icon className={`w-16 h-16 mx-auto ${roleMeta.color}`} /><h3 className={`text-2xl font-black uppercase tracking-wider ${roleMeta.color}`}>{roleMeta.name}</h3><span className="inline-block px-3 py-1 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-200">Tim {roleMeta.team}</span></div>
+                <p className="text-xs text-slate-200 leading-relaxed bg-black/40 p-3.5 rounded-2xl border border-white/10">{roleMeta.desc}</p>
+                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Unlock className="w-3 h-3" />Lepas untuk menutup</span>
               </div>
-            </div>
-          ) : (
-            <div {...holdProps} className="w-full max-w-xs aspect-[3/4] select-none outline-none cursor-pointer">
-              {!isHolding ? (
-                <div className="w-full h-full rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 flex flex-col items-center justify-center p-6 text-center shadow-2xl hover:border-amber-400 transition">
-                  <div className="w-20 h-20 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 mb-4"><Lock className="w-10 h-10 text-amber-400" /></div>
-                  <h3 className="text-base font-bold text-white mb-1">ROLE RAHASIA</h3><p className="text-xs text-slate-400">{hasViewed ? 'Tahan lagi untuk melihat. ' : ''}Tahan kartu ini untuk melihat role. Lepas untuk menutup.</p>
-                </div>
-              ) : (
-                <div className={`w-full h-full rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl`}>
-                  <div className="space-y-3"><Icon className={`w-16 h-16 mx-auto ${roleMeta.color}`} /><h3 className={`text-2xl font-black uppercase tracking-wider ${roleMeta.color}`}>{roleMeta.name}</h3><span className="inline-block px-3 py-1 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-200">Tim {roleMeta.team}</span></div>
-                  <p className="text-xs text-slate-200 leading-relaxed bg-black/40 p-3.5 rounded-2xl border border-white/10">{roleMeta.desc}</p>
-                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Unlock className="w-3 h-3" />Lepas untuk menutup</span>
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <div>
           {hasViewed && !isHolding ? (
             <button onClick={() => setGameState(prev => { const nextIndex = prev.revealPlayerIndex + 1; if (nextIndex >= prev.players.length) return { ...prev, currentPhase: 'NIGHT_INTRO', nightNumber: 1, isRoleCardOpen: false, gameLog: addLog(prev.gameLog, 1, 1, 'INFO', 'Pembagian role selesai. Memulai Malam 1.') }; return { ...prev, revealPlayerIndex: nextIndex, isRoleCardOpen: false }; })} className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT PEMAIN NEXT</span><ArrowRight className="w-5 h-5" /></button>
           ) : (
-            <p className="text-center text-xs text-slate-500 py-4">{gated ? 'Masukkan PIN untuk membuka kartu.' : 'Tombol lanjut muncul setelah role dilihat.'}</p>
+            <p className="text-center text-xs text-slate-500 py-4">Tombol lanjut muncul setelah role dilihat.</p>
           )}
         </div>
       </div>
@@ -1143,7 +1133,7 @@ export default function App() {
         {(gameState.lastNightDeaths || []).length === 0 ? (
           <div className="space-y-2"><Sun className="w-10 h-10 text-emerald-400 mx-auto" /><h3 className="text-xl font-black text-emerald-400">Semua Pemain Selamat!</h3><p className="text-xs text-slate-300">Semalam tidak ada pemain yang tereliminasi.</p></div>
         ) : (
-          <div className="space-y-3"><Skull className="w-10 h-10 text-red-400 mx-auto" /><h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3><div className="space-y-2">{(gameState.lastNightDeaths || []).map(({ player, reason }) => <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between"><span className="font-black text-white text-sm">{player.name}</span><span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">{DEATH_REASON_LABELS[reason] || reason}</span></div>)}</div></div>
+          <div className="space-y-3"><Skull className="w-10 h-10 text-red-400 mx-auto" /><h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3><div className="space-y-2 wf-stagger">{(gameState.lastNightDeaths || []).map(({ player, reason }) => <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between"><span className="font-black text-white text-sm">{player.name}</span><span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">{DEATH_REASON_LABELS[reason] || reason}</span></div>)}</div></div>
         )}
       </div>
       <button onClick={() => setGameState(prev => ({ ...prev, currentPhase: 'DISCUSSION', discussionEndTimestamp: null, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', `Memulai diskusi Hari ${prev.dayNumber}.`) }))} className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT KE WAKTU DISKUSI</span><ArrowRight className="w-5 h-5" /></button>
@@ -1365,9 +1355,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-900/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-950/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
+    <div data-tone={toneForPhase(gameState.currentPhase, gameState.winner)} className="wf-app min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
+      <style>{APP_STYLES}</style>
+      <div className="wf-blob wf-blob-a fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] blur-[120px] pointer-events-none -z-10 rounded-full" />
+      <div className="wf-blob wf-blob-b fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] blur-[120px] pointer-events-none -z-10 rounded-full" />
 
       {gameState.loverDeathNotice && gameState.loverDeathNotice.length > 0 && (
         <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
