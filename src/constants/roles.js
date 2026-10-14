@@ -49,6 +49,16 @@ export const ROLES = {
     desc: 'Melindungi 1 pemain setiap malam dari serangan Werewolf. Tidak boleh melindungi pemain yang sama dua malam berturut-turut.'
   },
 
+  BODYGUARD: {
+    name: 'Bodyguard',
+    team: 'Warga',
+    color: 'text-teal-300',
+    bg: 'bg-teal-950/90',
+    border: 'border-teal-600/60',
+    accent: 'from-teal-950 via-slate-900 to-slate-950',
+    desc: 'Setiap malam memilih 1 pemain lain untuk dikawal. Jika target diserang Werewolf, Bodyguard yang mati menggantikannya dan target selamat.'
+  },
+
   CUPID: {
     name: 'Cupid',
     team: 'Warga',
@@ -56,7 +66,7 @@ export const ROLES = {
     bg: 'bg-pink-950/90',
     border: 'border-pink-600/60',
     accent: 'from-pink-950 via-slate-900 to-slate-950',
-    desc: 'Aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati. Jika Lovers beda tim dan hanya mereka berdua yang tersisa, mereka menang bersama.'
+    desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.'
   },
 
   MAYOR: {
@@ -96,7 +106,7 @@ export const ROLES = {
     bg: 'bg-slate-900/90',
     border: 'border-slate-700',
     accent: 'from-slate-800 to-slate-950',
-    desc: 'Awalnya di kubu Warga (Seer melihatnya sebagai Warga). Jika seluruh Werewolf mati dan Traitor masih hidup, ia berubah menjadi Werewolf.'
+    desc: 'Awalnya di kubu Warga. Jika seluruh Werewolf mati dan Traitor masih hidup, ia berubah menjadi Werewolf.'
   },
 
   WOLF_CUB: {
@@ -136,7 +146,7 @@ export const ROLES = {
     bg: 'bg-indigo-950/90',
     border: 'border-indigo-600/60',
     accent: 'from-indigo-950 via-slate-900 to-slate-950',
-    desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger menggantikan role-nya dan mendapat kemampuan role itu secara penuh (termasuk yang sekali pakai).'
+    desc: 'Malam 1 memilih 1 target. Jika target mati, Doppelganger menggantikan role-nya.'
   }
 };
 
