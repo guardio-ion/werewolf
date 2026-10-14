@@ -116,7 +116,7 @@ export const ROLES = {
     bg: 'bg-fuchsia-950/90',
     border: 'border-fuchsia-600/60',
     accent: 'from-fuchsia-950 via-slate-900 to-slate-950',
-    desc: 'Tim Evil: menang bersama Werewolf, tetapi tidak ikut menyerang. Sekali per game memblokir kemampuan malam 1 pemain; aksi target tetap dijalankan tetapi tidak berefek, dan target tidak diberi tahu.'
+    desc: 'Tim Evil: menang bersama Werewolf, tetapi tidak ikut menyerang. Memblokir kemampuan malam 1 pemain (cooldown 2 malam setelah dipakai, aktif lagi di malam ke-3); aksi target tetap dijalankan tetapi tidak berefek, dan target tidak diberi tahu.'
   },
 
   CURSED: {
