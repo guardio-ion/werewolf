@@ -11,7 +11,7 @@ import { ROLES, ROLE_KEYS } from './constants/roles';
 import { GAME_PRESETS, PARTICIPANT_LIST } from './constants/presets';
 import { 
   LOCAL_STORAGE_KEY, GAME_STATE_VERSION, 
-  isWolfAligned, getEffectiveTeam, normalizePlayer, loadSavedGame, 
+  isWolfAligned, canAttackAsWolf, getEffectiveTeam, normalizePlayer, loadSavedGame, 
   shuffle, createInitialGameState, addLog, pushUndoState, randomInt 
 } from './utils/gameLogic';
 
@@ -82,6 +82,7 @@ export default function App() {
   const [showGameLogDrawer, setShowGameLogDrawer] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showRoleCheckModal, setShowRoleCheckModal] = useState(false); 
+  const [showModNote, setShowModNote] = useState(false);
   const [inputPlayerNames, setInputPlayerNames] = useState([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [participantSearch, setParticipantSearch] = useState('');
@@ -136,6 +137,9 @@ export default function App() {
     tick();
     return () => clearInterval(interval);
   }, [gameState.currentPhase, gameState.discussionEndTimestamp, gameState.isTimerPaused, gameState.pausedRemainingSeconds, gameState.discussionDurationSeconds]);
+
+  // Catatan moderator selalu tertutup saat berganti fase / aktor
+  useEffect(() => { setShowModNote(false); }, [gameState.currentPhase, gameState.nightActorId]);
 
   // Fase palsu: tampil seperti fase role biasa, lanjut otomatis setelah jeda acak.
   useEffect(() => {
@@ -245,7 +249,7 @@ export default function App() {
       const doppel = aliveOf(state, 'DOPPELGANGER').find(p => !p.doppelgangerCopied && state.nightNumber === 1 && !(p.id in (state.doppelgangerTargets || {})) && getLivingTargets(state, 'DOPPELGANGER', p.id).length > 0);
       if (doppel) return route('NIGHT_DOPPELGANGER', doppel);
 
-      const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
+      const livingWerewolves = state.players.filter(p => canAttackAsWolf(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
       const requiredWolfTargets = wolfLimits(state).min;
       const currentWolfCount = (state.werewolfTargetIds || []).length || (state.werewolfTargetId ? 1 : 0);
@@ -293,7 +297,7 @@ export default function App() {
     const protectedByTown = new Set(Object.values(effective(guardianActs)).map(a => a.targetId).filter(Boolean));
     const healedSet = new Set(Object.values(witchActs).map(a => a.healTargetId).filter(Boolean));
     // Memblokir seorang Werewolf menggagalkan seluruh serangan/penularan pack malam itu
-    const packBlocked = updatedPlayers.some(p => blockedIds.has(p.id) && isWolfAligned(p));
+    const packBlocked = updatedPlayers.some(p => blockedIds.has(p.id) && canAttackAsWolf(p));
     const conversions = [];
 
     const wolfTargets = packBlocked ? [] : Array.from(new Set([...(state.werewolfTargetIds || []), state.werewolfTargetId].filter(Boolean)));
@@ -407,7 +411,7 @@ export default function App() {
   }
 
   function activateTraitorIfNeeded(state) {
-    const livingWolves = state.players.filter(p => p.alive && isWolfAligned(p));
+    const livingWolves = state.players.filter(p => p.alive && canAttackAsWolf(p));
     const traitors = state.players.filter(p => p.alive && p.role === 'TRAITOR');
     if (livingWolves.length > 0 || traitors.length === 0) return state;
     
@@ -808,11 +812,11 @@ export default function App() {
   const renderSetup = () => {
     const trimmedNames = inputPlayerNames.map(n => n.trim()).filter(Boolean);
     const totalRoles = Object.values(roleCountsDraft).reduce((s, n) => s + (Number(n) || 0), 0);
-    const wolfCount = ['WEREWOLF', 'WOLF_CUB'].reduce((s, k) => s + (Number(roleCountsDraft[k]) || 0), 0);
+    const wolfCount = ['WEREWOLF', 'WOLF_CUB', 'ALPHA_WOLF'].reduce((s, k) => s + (Number(roleCountsDraft[k]) || 0), 0);
     const setupIssues = [];
     if (trimmedNames.length < 5 || trimmedNames.length > 25) setupIssues.push('Jumlah pemain harus 5–25.');
     if (totalRoles !== playerCount) setupIssues.push(`Total role (${totalRoles}) harus sama dengan jumlah pemain (${playerCount}).`);
-    if (wolfCount === 0) setupIssues.push('Minimal harus ada 1 Werewolf atau Wolf Cub.');
+    if (wolfCount === 0) setupIssues.push('Minimal harus ada 1 Werewolf, Wolf Cub, atau Alpha Wolf.');
     const setupWarnings = [];
     if (wolfCount > 0 && wolfCount * 2 >= playerCount) setupWarnings.push('Jumlah Werewolf sudah ≥ separuh pemain, game bisa langsung berakhir.');
     const canStart = setupIssues.length === 0;
@@ -965,6 +969,36 @@ export default function App() {
             <button onClick={() => setGameState(prev => ({ ...prev, isRoleCardOpen: true }))} className="w-full py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 shadow-xl transition">LIHAT ROLE</button>
           )}
         </div>
+      </div>
+    );
+  };
+
+  // Catatan khusus moderator untuk fase aktor malam. Tombol "i" selalu ada di setiap fase aktor
+  // dengan tampilan yang sama; isinya baru muncul saat diketuk, jadi tidak membocorkan apa pun.
+  const MOD_NOTE_PHASES = ['NIGHT_ILLUSIONIST', 'NIGHT_CUPID', 'NIGHT_DOPPELGANGER', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_BODYGUARD', 'NIGHT_SHERIFF', 'NIGHT_SEER', 'NIGHT_WITCH'];
+  const moderatorNotes = (state) => {
+    const notes = [];
+    const phase = state.currentPhase;
+    if (phase === 'NIGHT_WEREWOLF') {
+      if ((state.players || []).some(p => p.alive && isBlocked(state, p.id) && canAttackAsWolf(p))) notes.push('⚠ Pack Werewolf diblokir Illusionist: serangan / penularan malam ini tidak berefek. Jalankan fase seperti biasa.');
+    } else {
+      const actor = getActor(state);
+      if (actor && isBlocked(state, actor.id)) notes.push(`⚠ ${actor.name} diblokir Illusionist: aksinya tidak berefek${phase === 'NIGHT_SEER' ? ' (hasil ramalan diacak sistem)' : ''}. Jangan beri tahu pemainnya.`);
+    }
+    if (phase === 'NIGHT_SEER' && isEventTonight(state, 'ECLIPSE')) notes.push('🌘 Gerhana: hasil ramalan diacak oleh sistem (Werewolf / Warga, 50:50).');
+    return notes.length ? notes : ['Tidak ada gangguan: aksi berjalan normal.'];
+  };
+  const renderModeratorNote = () => {
+    if (!MOD_NOTE_PHASES.includes(gameState.currentPhase)) return null;
+    return (
+      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+        {showModNote && (
+          <div className="max-w-[16rem] rounded-2xl border border-amber-700/60 bg-slate-900/95 p-3 shadow-xl space-y-1 animate-fadeIn">
+            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Catatan moderator</p>
+            {moderatorNotes(gameState).map((n, i) => <p key={i} className="text-xs text-slate-200 leading-relaxed">{n}</p>)}
+          </div>
+        )}
+        <button onClick={() => setShowModNote(v => !v)} aria-label="Catatan moderator" className="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400 text-sm font-black hover:bg-slate-700 transition">i</button>
       </div>
     );
   };
@@ -1504,6 +1538,7 @@ export default function App() {
       <main key={`${gameState.currentPhase}-${gameState.nightNumber}-${gameState.dayNumber}`} className="flex-1 pb-8">
         {renderCurrentPhase()}
       </main>
+      {renderModeratorNote()}
 
       {showRoleCheckModal && (
         <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
@@ -1520,7 +1555,7 @@ export default function App() {
                   <div key={p.id} className={`p-3 rounded-2xl border ${p.alive ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-950/30 border-slate-900 opacity-60'} flex items-center justify-between`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.bg} border ${meta.border}`}><Icon className={`w-4 h-4 ${meta.color}`} /></div>
-                      <div><h4 className="font-bold text-white text-sm">{p.name}</h4><span className={`text-[10px] font-black ${meta.color}`}>{meta.name}</span>{isWolfAligned(p) && !['WEREWOLF', 'WOLF_CUB', 'ALPHA_WOLF'].includes(p.role) && <span className="ml-1.5 text-[10px] font-black text-red-400">→ Werewolf (tertular)</span>}</div>
+                      <div><h4 className="font-bold text-white text-sm">{p.name}</h4><span className={`text-[10px] font-black ${meta.color}`}>{meta.name}</span>{isWolfAligned(p) && !['WEREWOLF', 'WOLF_CUB', 'ALPHA_WOLF', 'ILLUSIONIST'].includes(p.role) && <span className="ml-1.5 text-[10px] font-black text-red-400">→ Werewolf (tertular)</span>}</div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${p.alive ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-red-950/80 text-red-400 border-red-900'}`}>{p.alive ? 'Hidup' : 'Mati'}</span>
                   </div>
