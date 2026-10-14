@@ -34,6 +34,9 @@ const EVENT_INFO = {
   FOG: { emoji: '🌫️', name: 'Kabut', text: 'Siang berikutnya TIDAK ADA voting. Umumkan saat pagi.' }
 };
 
+// Illusionist: setelah dipakai di malam N, aktif lagi di malam N + ILLUSIONIST_COOLDOWN.
+const ILLUSIONIST_COOLDOWN = 3;
+
 // Jeda fase palsu: 6–15 detik (acak aman), supaya terasa seperti fase sungguhan.
 const FAKE_PHASE_MIN_MS = 6000;
 const FAKE_PHASE_SPREAD_MS = 9000;
@@ -199,6 +202,8 @@ export default function App() {
     const max = Math.min(rage || isEventTonight(state, 'BLOOD_MOON') ? 2 : 1, avail);
     return { min: rage ? max : Math.min(1, max), max };
   };
+  const illusionistLastUsed = (state, id) => { const v = ((state.abilityUsed || {})[id] || {}).ILLUSIONIST; return v === true ? 1 : (Number(v) || 0); };
+  const illusionistReady = (state, id) => { const last = illusionistLastUsed(state, id); return !last || state.nightNumber - last >= ILLUSIONIST_COOLDOWN; };
   const alphaAvailable = (state) => aliveOf(state, 'ALPHA_WOLF').find(p => !isUsed(state, p.id, 'ALPHA_CONVERT')) || null;
   const isBlocked = (state, playerId) => Object.values(getActs(state, 'ILLUSIONIST')).some(a => a && a.targetId === playerId);
 
@@ -234,7 +239,7 @@ export default function App() {
       if (state.eventsEnabled && state.nightNumber >= 2 && state.eventDrawnNight !== state.nightNumber) return route('NIGHT_EVENT', null);
 
       // Illusionist bangun pertama agar blokirnya berlaku untuk semua role malam itu
-      const illusionist = aliveOf(state, 'ILLUSIONIST').find(p => !getActs(state, 'ILLUSIONIST')[p.id] && !isUsed(state, p.id, 'ILLUSIONIST') && getLivingTargets(state, 'ILLUSIONIST', p.id).length > 0);
+      const illusionist = aliveOf(state, 'ILLUSIONIST').find(p => !getActs(state, 'ILLUSIONIST')[p.id] && illusionistReady(state, p.id) && getLivingTargets(state, 'ILLUSIONIST', p.id).length > 0);
       if (illusionist) return route('NIGHT_ILLUSIONIST', illusionist);
       const fakeIllusionist = fakeStep('ILLUSIONIST'); if (fakeIllusionist) return fakeIllusionist;
 
@@ -569,7 +574,7 @@ export default function App() {
     const actor = getActor(gameState);
     const targetId = (gameState.draft || {}).targetId;
     if (!actor || !validateTarget(gameState, 'ILLUSIONIST', targetId, actor.id).valid) return;
-    advanceNightPhase({ nightActs: withAct(gameState, 'ILLUSIONIST', actor.id, { targetId }), abilityUsed: markUsed(gameState, actor.id, 'ILLUSIONIST'), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Illusionist ${actor.name} memblokir 1 pemain.`) }, { recordUndo: true });
+    advanceNightPhase({ nightActs: withAct(gameState, 'ILLUSIONIST', actor.id, { targetId }), abilityUsed: { ...(gameState.abilityUsed || {}), [actor.id]: { ...((gameState.abilityUsed || {})[actor.id] || {}), ILLUSIONIST: gameState.nightNumber } }, draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Illusionist ${actor.name} memblokir 1 pemain (aktif lagi Malam ${gameState.nightNumber + ILLUSIONIST_COOLDOWN}).`) }, { recordUndo: true });
   };
 
   // Tarik kartu kejadian desa: 50% tenang, 17% Gerhana, 17% Bulan Darah, 16% Kabut
@@ -971,11 +976,15 @@ export default function App() {
 
   // Banner untuk moderator di fase aktor malam: blokir Illusionist & Gerhana.
   // Web ini hanya dipegang moderator, jadi banner langsung tampil (hanya bila ada yang perlu diingat).
-  const MOD_NOTE_PHASES = ['NIGHT_ILLUSIONIST', 'NIGHT_CUPID', 'NIGHT_DOPPELGANGER', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_BODYGUARD', 'NIGHT_SHERIFF', 'NIGHT_SEER', 'NIGHT_WITCH'];
+  const MOD_NOTE_PHASES = ['NIGHT_FAKE', 'NIGHT_ILLUSIONIST', 'NIGHT_CUPID', 'NIGHT_DOPPELGANGER', 'NIGHT_WEREWOLF', 'NIGHT_GUARDIAN', 'NIGHT_BODYGUARD', 'NIGHT_SHERIFF', 'NIGHT_SEER', 'NIGHT_WITCH'];
   const moderatorNotes = (state) => {
     const notes = [];
     const phase = state.currentPhase;
     if (!MOD_NOTE_PHASES.includes(phase)) return notes;
+    if (phase === 'NIGHT_FAKE') {
+      if (state.fakeRole === 'ILLUSIONIST') (state.players || []).filter(p => p.alive && p.role === 'ILLUSIONIST' && !illusionistReady(state, p.id)).forEach(p => notes.push(`Illusionist ${p.name} sedang cooldown: aktif lagi di Malam ${illusionistLastUsed(state, p.id) + ILLUSIONIST_COOLDOWN}. Jalankan fase palsu seperti biasa.`));
+      return notes;
+    }
     if (phase === 'NIGHT_WEREWOLF') {
       if ((state.players || []).some(p => p.alive && isBlocked(state, p.id) && canAttackAsWolf(p))) notes.push('⚠ Pack Werewolf diblokir Illusionist: serangan / penularan malam ini tidak berefek. Jalankan fase seperti biasa.');
     } else {
@@ -1090,7 +1099,7 @@ export default function App() {
     const draft = gameState.draft || {};
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
-        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-fuchsia-950/90 border border-fuchsia-700/60 text-fuchsia-300 shadow-lg"><EyeOff className="w-8 h-8" /></div><h2 className="text-2xl font-black text-fuchsia-300">ILLUSIONIST PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Sekali per game: pilih 1 pemain, kemampuan malamnya diblokir malam ini. Jalankan fasenya seperti biasa; targetnya tidak diberi tahu.</p></div>
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-fuchsia-950/90 border border-fuchsia-700/60 text-fuchsia-300 shadow-lg"><EyeOff className="w-8 h-8" /></div><h2 className="text-2xl font-black text-fuchsia-300">ILLUSIONIST PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain, kemampuan malamnya diblokir malam ini. Setelah dipakai, istirahat 2 malam. Jalankan fasenya seperti biasa; targetnya tidak diberi tahu.</p></div>
         {actorBanner(actor)}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
           {getLivingTargets(gameState, 'ILLUSIONIST', actor?.id).map(player => { const isSelected = draft.targetId === player.id; return <button key={player.id} onClick={() => setDraft({ targetId: player.id })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-fuchsia-950/80 border-fuchsia-500 text-fuchsia-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <EyeOff className="w-4 h-4 text-fuchsia-300 shrink-0" />}</button>; })}
