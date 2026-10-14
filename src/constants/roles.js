@@ -111,12 +111,12 @@ export const ROLES = {
 
   ILLUSIONIST: {
     name: 'Illusionist',
-    team: 'Warga',
+    team: 'Evil',
     color: 'text-fuchsia-300',
     bg: 'bg-fuchsia-950/90',
     border: 'border-fuchsia-600/60',
     accent: 'from-fuchsia-950 via-slate-900 to-slate-950',
-    desc: 'Sekali per game memblokir kemampuan malam 1 pemain. Aksi target tetap dijalankan tetapi tidak berefek, dan target tidak diberi tahu.'
+    desc: 'Tim Evil: menang bersama Werewolf, tetapi tidak ikut menyerang. Sekali per game memblokir kemampuan malam 1 pemain; aksi target tetap dijalankan tetapi tidak berefek, dan target tidak diberi tahu.'
   },
 
   CURSED: {
