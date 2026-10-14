@@ -4,7 +4,7 @@ import {
   Heart, Skull, Users, History, BookOpen, X,
   Crown, Play, Pause, HelpCircle, Sparkles, ArrowRight, CornerUpLeft,
   Check, RefreshCw, User, PawPrint, Swords, Star, 
-  MessageSquare, CheckSquare, Ghost, ShieldCheck
+  MessageSquare, CheckSquare, Ghost, ShieldCheck, EyeOff
 } from 'lucide-react';
 
 import { ROLES, ROLE_KEYS } from './constants/roles';
@@ -17,7 +17,7 @@ import {
 
 const ROLE_ICONS = {
   WARGA: User, WEREWOLF: PawPrint, LYCAN: Moon, SEER: Eye, GUARDIAN: Shield,
-  CUPID: Heart, BODYGUARD: ShieldCheck, MAYOR: Crown, SHERIFF: Star, HUNTER: Crosshair, TRAITOR: Swords,
+  CUPID: Heart, BODYGUARD: ShieldCheck, ALPHA_WOLF: Crown, ILLUSIONIST: EyeOff, CURSED: Skull, SHERIFF: Star, HUNTER: Crosshair, TRAITOR: Swords,
   WOLF_CUB: PawPrint, WITCH: FlaskConical, JESTER: Sparkles, DOPPELGANGER: Ghost
 };
 
@@ -26,6 +26,13 @@ const DEATH_REASON_LABELS = {
   SHERIFF_MISS: 'Sheriff salah tembak', BODYGUARD: 'Mati menggantikan target (Bodyguard)', LOVER: 'Ikut pasangan', HUNTER: 'Dibalas Hunter', VOTE: 'Hasil voting'
 };
 
+
+// Kartu kejadian desa (opsional). Gerhana & Bulan Darah berlaku malam itu, Kabut berlaku di siang berikutnya.
+const EVENT_INFO = {
+  ECLIPSE: { emoji: '🌘', name: 'Gerhana', text: 'Hasil ramalan Seer malam ini ACAK (Werewolf / Warga). Seer tidak diberi tahu.' },
+  BLOOD_MOON: { emoji: '🩸', name: 'Bulan Darah', text: 'Malam ini Werewolf boleh memilih sampai 2 korban.' },
+  FOG: { emoji: '🌫️', name: 'Kabut', text: 'Siang berikutnya TIDAK ADA voting. Umumkan saat pagi.' }
+};
 
 // Jeda fase palsu: 6–15 detik (acak aman), supaya terasa seperti fase sungguhan.
 const FAKE_PHASE_MIN_MS = 6000;
@@ -83,6 +90,7 @@ export default function App() {
   const [remainingSeconds, setRemainingSeconds] = useState(300);
   const [voteError, setVoteError] = useState('');
   const [fakeDraft, setFakeDraft] = useState(true);
+  const [eventsDraft, setEventsDraft] = useState(false);
   const [fakeNow, setFakeNow] = useState(Date.now());
 
   // Saat jumlah pemain berubah: isi/seimbangkan jumlah WARGA agar total role = jumlah pemain
@@ -148,9 +156,16 @@ export default function App() {
     discussionTransitionLock.current = true;
     setGameState(prev => {
       if (prev.currentPhase !== 'DISCUSSION') return prev;
-      return { ...prev, currentPhase: 'VOTING', currentVoterIndex: 0, voteTally: {}, voteRecorded: false, mayorVotes: {}, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.') };
+      if (isFogDay(prev)) {
+        // Kabut: hari berakhir tanpa voting, tidak ada yang tereliminasi.
+        return finalizeResolution({ ...prev, undoStack: pushUndoState(prev), lastDayDeaths: [], loverDeathNotice: [], doppelgangerNotices: [], gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Kabut menyelimuti desa: tidak ada voting hari ini.') }, 'DAY');
+      }
+      return { ...prev, currentPhase: 'VOTING', currentVoterIndex: 0, voteTally: {}, voteRecorded: false, skipVotes: '', isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', 'Waktu diskusi berakhir. Memulai sesi voting.') };
     });
   }
+
+  const isFogDay = (state) => !!(state.activeEvent && state.activeEvent.type === 'FOG' && state.activeEvent.night === state.nightNumber);
+  const isEventTonight = (state, type) => !!(state.activeEvent && state.activeEvent.type === type && state.activeEvent.night === state.nightNumber);
 
   // ---------- helper aksi malam per-aktor (mendukung role ganda) ----------
   const aliveOf = (state, role) => (state.players || []).filter(p => p.alive && p.role === role);
@@ -168,6 +183,7 @@ export default function App() {
       case 'CUPID': return players.filter(p => p.alive && !p.loverId);
       case 'SHERIFF':
       case 'BODYGUARD':
+      case 'ILLUSIONIST':
       case 'DOPPELGANGER':
       case 'SEER': return players.filter(p => p.alive && p.id !== actorId);
       case 'HUNTER':
@@ -175,6 +191,16 @@ export default function App() {
       default: return players.filter(p => p.alive);
     }
   };
+
+  // Batas jumlah korban Werewolf: Wolf Cub Rage = tepat 2, Bulan Darah = boleh 1-2.
+  const wolfLimits = (state) => {
+    const avail = getLivingTargets(state, 'WEREWOLF').length;
+    const rage = !!state.wolfCubRagePending;
+    const max = Math.min(rage || isEventTonight(state, 'BLOOD_MOON') ? 2 : 1, avail);
+    return { min: rage ? max : Math.min(1, max), max };
+  };
+  const alphaAvailable = (state) => aliveOf(state, 'ALPHA_WOLF').find(p => !isUsed(state, p.id, 'ALPHA_CONVERT')) || null;
+  const isBlocked = (state, playerId) => Object.values(getActs(state, 'ILLUSIONIST')).some(a => a && a.targetId === playerId);
 
   const validateTarget = (state, kind, targetId, actorId) => {
     if (!targetId) return { valid: false };
@@ -204,6 +230,14 @@ export default function App() {
         return { ...commit, currentPhase: 'NIGHT_FAKE', nightActorId: null, fakeRole: role, fakeEndTimestamp: Date.now() + FAKE_PHASE_MIN_MS + randomInt(FAKE_PHASE_SPREAD_MS + 1) };
       };
 
+      // Kartu kejadian desa (opsional): ditarik moderator di awal malam 2 dan seterusnya
+      if (state.eventsEnabled && state.nightNumber >= 2 && state.eventDrawnNight !== state.nightNumber) return route('NIGHT_EVENT', null);
+
+      // Illusionist bangun pertama agar blokirnya berlaku untuk semua role malam itu
+      const illusionist = aliveOf(state, 'ILLUSIONIST').find(p => !getActs(state, 'ILLUSIONIST')[p.id] && !isUsed(state, p.id, 'ILLUSIONIST') && getLivingTargets(state, 'ILLUSIONIST', p.id).length > 0);
+      if (illusionist) return route('NIGHT_ILLUSIONIST', illusionist);
+      const fakeIllusionist = fakeStep('ILLUSIONIST'); if (fakeIllusionist) return fakeIllusionist;
+
       // Cupid: malam 1, atau Doppelganger yang sudah menyalin Cupid (sekali per aktor)
       const cupid = aliveOf(state, 'CUPID').find(p => !getActs(state, 'CUPID')[p.id] && !isUsed(state, p.id, 'CUPID') && (state.nightNumber === 1 || p.doppelgangerCopied) && getLivingTargets(state, 'CUPID', p.id).length >= 2);
       if (cupid) return route('NIGHT_CUPID', cupid);
@@ -213,9 +247,9 @@ export default function App() {
 
       const livingWerewolves = state.players.filter(p => isWolfAligned(p) && p.alive);
       const wolfTargets = getLivingTargets(state, 'WEREWOLF');
-      const requiredWolfTargets = Math.min(state.wolfCubRagePending ? 2 : 1, wolfTargets.length);
+      const requiredWolfTargets = wolfLimits(state).min;
       const currentWolfCount = (state.werewolfTargetIds || []).length || (state.werewolfTargetId ? 1 : 0);
-      if (livingWerewolves.length > 0 && wolfTargets.length > 0 && currentWolfCount < requiredWolfTargets && !state.nightSkips?.WEREWOLF) {
+      if (livingWerewolves.length > 0 && wolfTargets.length > 0 && currentWolfCount < requiredWolfTargets && !state.alphaConvertTargetId && !state.nightSkips?.WEREWOLF) {
         return route('NIGHT_WEREWOLF', null);
       }
 
@@ -249,15 +283,23 @@ export default function App() {
     const night = state.nightNumber, day = state.dayNumber;
     const directDeaths = [];
     const guardianActs = getActs(state, 'GUARDIAN');
-    const witchActs = getActs(state, 'WITCH');
-    const bodyguardActs = getActs(state, 'BODYGUARD');
+    // Illusionist: aksi target tetap berjalan tetapi tidak berefek (target tidak diberi tahu)
+    const blockedIds = new Set(Object.values(getActs(state, 'ILLUSIONIST')).map(a => a && a.targetId).filter(Boolean));
+    const effective = (acts) => Object.fromEntries(Object.entries(acts).filter(([actorId]) => !blockedIds.has(actorId)));
+    blockedIds.forEach(id => { const bp = updatedPlayers.find(p => p.id === id); if (bp) log = addLog(log, night, day, 'ACTION', `Illusionist memblokir kemampuan ${bp.name} malam ini.`); });
+    const witchActs = effective(getActs(state, 'WITCH'));
+    const bodyguardActs = effective(getActs(state, 'BODYGUARD'));
     const usedBodyguards = new Set();
-    const protectedByTown = new Set(Object.values(guardianActs).map(a => a.targetId).filter(Boolean));
+    const protectedByTown = new Set(Object.values(effective(guardianActs)).map(a => a.targetId).filter(Boolean));
     const healedSet = new Set(Object.values(witchActs).map(a => a.healTargetId).filter(Boolean));
+    // Memblokir seorang Werewolf menggagalkan seluruh serangan/penularan pack malam itu
+    const packBlocked = updatedPlayers.some(p => blockedIds.has(p.id) && isWolfAligned(p));
+    const conversions = [];
 
-    const wolfTargets = Array.from(new Set([...(state.werewolfTargetIds || []), state.werewolfTargetId].filter(Boolean)));
+    const wolfTargets = packBlocked ? [] : Array.from(new Set([...(state.werewolfTargetIds || []), state.werewolfTargetId].filter(Boolean)));
     wolfTargets.forEach(targetId => {
-      const victimName = updatedPlayers.find(p => p.id === targetId)?.name;
+      const victim = updatedPlayers.find(p => p.id === targetId);
+      const victimName = victim?.name;
       if (!victimName) return;
       if (protectedByTown.has(targetId)) { log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${victimName} berhasil dicegah Guardian.`); }
       else if (healedSet.has(targetId)) { log = addLog(log, night, day, 'INFO', `Heal Potion Witch berhasil menyelamatkan korban Werewolf.`); }
@@ -269,11 +311,24 @@ export default function App() {
           usedBodyguards.add(guardEntry[0]);
           directDeaths.push({ id: guardEntry[0], reason: 'BODYGUARD' });
           log = addLog(log, night, day, 'ACTION', `Bodyguard ${bgName} mati menggantikan ${victimName}.`);
+        } else if (victim.role === 'CURSED') {
+          // Cursed tidak mati: berubah menjadi Werewolf
+          conversions.push({ id: targetId, cause: 'CURSED' });
+          log = addLog(log, night, day, 'ACTION', `${victimName} (Cursed) diserang Werewolf dan akan berubah menjadi Werewolf.`);
         } else { directDeaths.push({ id: targetId, reason: 'WEREWOLF' }); }
       }
     });
 
-    Object.entries(getActs(state, 'SHERIFF')).forEach(([actorId, act]) => {
+    // Alpha Wolf: penularan menggantikan serangan malam. Guardian dapat mencegahnya.
+    if (state.alphaConvertTargetId && !packBlocked) {
+      const t = updatedPlayers.find(p => p.id === state.alphaConvertTargetId);
+      if (t && t.alive && !isWolfAligned(t)) {
+        if (protectedByTown.has(t.id)) log = addLog(log, night, day, 'INFO', `Penularan Alpha Wolf pada ${t.name} berhasil dicegah Guardian.`);
+        else { conversions.push({ id: t.id, cause: 'ALPHA' }); log = addLog(log, night, day, 'ACTION', `Alpha Wolf menulari ${t.name}.`); }
+      }
+    }
+
+    Object.entries(effective(getActs(state, 'SHERIFF'))).forEach(([actorId, act]) => {
       if (!act || !act.targetId) return;
       const sheriff = updatedPlayers.find(p => p.id === actorId && p.alive);
       const target = updatedPlayers.find(p => p.id === act.targetId && p.alive);
@@ -319,6 +374,16 @@ export default function App() {
       log = addLog(log, night, day, 'DEATH', `${updatedPlayers[idx].name} tereliminasi.`);
     });
 
+    // Terapkan perubahan tim (Cursed / Alpha Wolf) hanya pada yang masih hidup
+    const convNotices = [];
+    conversions.forEach(c => {
+      const idx = updatedPlayers.findIndex(p => p.id === c.id);
+      if (idx === -1 || !updatedPlayers[idx].alive) return;
+      updatedPlayers[idx] = c.cause === 'CURSED' ? { ...updatedPlayers[idx], role: 'WEREWOLF' } : { ...updatedPlayers[idx], convertedToWerewolf: true };
+      convNotices.push({ kind: 'CONVERT', cause: c.cause, playerId: c.id, playerName: updatedPlayers[idx].name });
+      log = addLog(log, night, day, 'ROLE', `⚠️ PENGINGAT MODERATOR: ${updatedPlayers[idx].name} kini Werewolf (${c.cause === 'CURSED' ? 'Cursed diserang' : 'ditulari Alpha Wolf'}).`);
+    });
+
     // Guardian tidak boleh melindungi target yang sama dua malam berturut-turut (per Guardian)
     const guardianLast = {};
     Object.entries(guardianActs).forEach(([actorId, act]) => { guardianLast[actorId] = (act && act.targetId) || null; });
@@ -329,8 +394,10 @@ export default function App() {
 
     let tempState = {
       ...state, ...dop.patch, players: updatedPlayers, gameLog: log, lastNightDeaths: nightDeathsList,
-      wolfCubRagePending: nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
-      loverDeathNotice, doppelgangerNotices: dop.notices,
+      // Rage tetap tertunda jika pack memakai penularan Alpha alih-alih menyerang
+      wolfCubRagePending: nightDeathsList.some(d => d.player.role === 'WOLF_CUB') || (!!state.wolfCubRagePending && !!state.alphaConvertTargetId),
+      loverDeathNotice, doppelgangerNotices: [...dop.notices, ...convNotices],
+      alphaConvertTargetId: null, werewolfMode: 'KILL',
       werewolfTargetId: null, werewolfTargetIds: [], nightActs: {}, draft: {}, nightActorId: null, guardianLast, seerResult: null, nightSkips: {}, nightFakes: {}, fakeRole: null, fakeEndTimestamp: null,
     };
 
@@ -366,7 +433,7 @@ export default function App() {
     return null;
   }
 
-  // Hitung perolehan suara dari tally input moderator (+1 ekstra untuk pilihan Mayor yang sudah terungkap)
+  // Hitung perolehan suara dari tally input moderator. Suara SKIP dihitung terpisah.
   function computeVoteCounts(state) {
     const counts = {};
     let total = 0;
@@ -377,12 +444,8 @@ export default function App() {
       counts[id] = n;
       total += n;
     });
-    const revealed = state.mayorRevealedIds || [];
-    (state.players || []).filter(p => p.role === 'MAYOR' && p.alive && revealed.includes(p.id)).forEach(m => {
-      const t = (state.mayorVotes || {})[m.id];
-      if (t && counts[t]) counts[t] += 1;
-    });
-    return { counts, total };
+    const skip = Math.max(0, parseInt(state.skipVotes, 10) || 0);
+    return { counts, total, skip };
   }
 
   // Matikan pemain + rantai kematian Lovers (dipakai voting & Hunter)
@@ -435,7 +498,7 @@ export default function App() {
       nextPhase = 'NIGHT_INTRO';
       next = {
         ...next, nightNumber: night + 1, dayNumber: day + 1,
-        voteTally: {}, voteRecorded: false, mayorVotes: {}, currentVoterIndex: 0,
+        voteTally: {}, voteRecorded: false, skipVotes: '', activeEvent: null, currentVoterIndex: 0,
         discussionEndTimestamp: null, isTimerPaused: false, pausedRemainingSeconds: null,
         gameLog: addLog(log, night + 1, day + 1, 'INFO', `Memulai Malam ${night + 1}.`)
       };
@@ -451,9 +514,12 @@ export default function App() {
     const target = gameState.players.find(p => p.id === targetId);
     if (!target) return;
     let displayedRole = target.role, isLycanNote = false;
-    if (target.role === 'LYCAN') { displayedRole = 'WEREWOLF'; isLycanNote = true; }
-    else if (target.role === 'JESTER') { displayedRole = 'WARGA'; }
-    else if (target.role === 'TRAITOR') { displayedRole = target.convertedToWerewolf ? 'WEREWOLF' : 'WARGA'; }
+    if (target.convertedToWerewolf) { displayedRole = 'WEREWOLF'; }
+    else if (target.role === 'LYCAN') { displayedRole = 'WEREWOLF'; isLycanNote = true; }
+    else if (target.role === 'JESTER' || target.role === 'CURSED') { displayedRole = 'WARGA'; }
+    else if (target.role === 'TRAITOR') { displayedRole = 'WARGA'; }
+    // Gerhana atau diblokir Illusionist: hasil acak (Seer tidak diberi tahu)
+    if (isEventTonight(gameState, 'ECLIPSE') || isBlocked(gameState, actor.id)) { displayedRole = randomInt(2) === 0 ? 'WEREWOLF' : 'WARGA'; isLycanNote = false; }
     setGameState(prev => ({ ...prev, nightActs: withAct(prev, 'SEER', actor.id, { targetId }), seerResult: { targetName: target.name, displayedRole, isLycanNote }, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Seer ${actor.name} meramal ${target.name}.`) }));
   };
 
@@ -463,7 +529,8 @@ export default function App() {
     if (!actor || !l1 || !l2 || l1 === l2) return;
     const p1 = gameState.players.find(p => p.id === l1), p2 = gameState.players.find(p => p.id === l2);
     if (!p1?.alive || !p2?.alive || p1.loverId || p2.loverId) return;
-    const updatedPlayers = gameState.players.map(p => p.id === l1 ? { ...p, loverId: l2 } : p.id === l2 ? { ...p, loverId: l1 } : p);
+    // Diblokir Illusionist: tetap tercatat terpakai, tetapi Lovers tidak terbentuk
+    const updatedPlayers = isBlocked(gameState, actor.id) ? gameState.players : gameState.players.map(p => p.id === l1 ? { ...p, loverId: l2 } : p.id === l2 ? { ...p, loverId: l1 } : p);
     advanceNightPhase({ players: updatedPlayers, nightActs: withAct(gameState, 'CUPID', actor.id, { l1, l2 }), abilityUsed: markUsed(gameState, actor.id, 'CUPID'), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Cupid ${actor.name} memilih ${p1.name} & ${p2.name}.`) }, { recordUndo: true });
   };
 
@@ -472,7 +539,7 @@ export default function App() {
     const targetId = (gameState.draft || {}).targetId;
     if (!actor || !validateTarget(gameState, 'DOPPELGANGER', targetId, actor.id).valid) return;
     const target = gameState.players.find(p => p.id === targetId);
-    advanceNightPhase({ doppelgangerTargets: { ...(gameState.doppelgangerTargets || {}), [actor.id]: targetId }, draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Doppelganger ${actor.name} memilih ${target.name}.`) }, { recordUndo: true });
+    advanceNightPhase({ doppelgangerTargets: { ...(gameState.doppelgangerTargets || {}), [actor.id]: isBlocked(gameState, actor.id) ? null : targetId }, draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Doppelganger ${actor.name} memilih ${target.name}.`) }, { recordUndo: true });
   };
 
   const handleConfirmSheriff = () => {
@@ -483,11 +550,35 @@ export default function App() {
   };
 
   const handleConfirmWerewolf = (selectedIds) => {
-    const required = Math.min(gameState.wolfCubRagePending ? 2 : 1, getLivingTargets(gameState, 'WEREWOLF').length);
-    if (!selectedIds || selectedIds.length !== required || new Set(selectedIds).size !== required) return;
+    if (gameState.werewolfMode === 'CONVERT') {
+      // Alpha Wolf: tulari 1 pemain sebagai pengganti serangan malam
+      const alpha = alphaAvailable(gameState);
+      if (!alpha || !selectedIds || selectedIds.length !== 1 || !validateTarget(gameState, 'WEREWOLF', selectedIds[0]).valid) return;
+      advanceNightPhase({ alphaConvertTargetId: selectedIds[0], werewolfTargetIds: [], werewolfTargetId: null, abilityUsed: markUsed(gameState, alpha.id, 'ALPHA_CONVERT'), gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', 'Alpha Wolf memilih menulari 1 pemain.') }, { recordUndo: true });
+      return;
+    }
+    const { min, max } = wolfLimits(gameState);
+    if (!selectedIds || selectedIds.length < min || selectedIds.length > max || new Set(selectedIds).size !== selectedIds.length) return;
     if (!selectedIds.every(id => validateTarget(gameState, 'WEREWOLF', id).valid)) return;
     advanceNightPhase({ werewolfTargetIds: [...selectedIds], werewolfTargetId: selectedIds[0] || null, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Werewolf mengunci target.`) }, { recordUndo: true });
   };
+
+  const handleSetWerewolfMode = (mode) => setGameState(prev => ({ ...prev, werewolfMode: mode === 'CONVERT' && alphaAvailable(prev) ? 'CONVERT' : 'KILL', werewolfTargetIds: [], werewolfTargetId: null }));
+
+  const handleConfirmIllusionist = () => {
+    const actor = getActor(gameState);
+    const targetId = (gameState.draft || {}).targetId;
+    if (!actor || !validateTarget(gameState, 'ILLUSIONIST', targetId, actor.id).valid) return;
+    advanceNightPhase({ nightActs: withAct(gameState, 'ILLUSIONIST', actor.id, { targetId }), abilityUsed: markUsed(gameState, actor.id, 'ILLUSIONIST'), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Illusionist ${actor.name} memblokir 1 pemain.`) }, { recordUndo: true });
+  };
+
+  // Tarik kartu kejadian desa: 50% tenang, 17% Gerhana, 17% Bulan Darah, 16% Kabut
+  const handleDrawEvent = () => setGameState(prev => {
+    if (prev.currentPhase !== 'NIGHT_EVENT' || prev.eventDrawnNight === prev.nightNumber) return prev;
+    const roll = randomInt(100);
+    const type = roll < 50 ? null : roll < 67 ? 'ECLIPSE' : roll < 84 ? 'BLOOD_MOON' : 'FOG';
+    return { ...prev, undoStack: pushUndoState(prev), activeEvent: type ? { type, night: prev.nightNumber } : null, eventDrawnNight: prev.nightNumber, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', type ? `Kartu kejadian: ${EVENT_INFO[type].name}.` : 'Kartu kejadian: malam tenang.') };
+  });
 
   const handleConfirmGuardian = () => {
     const actor = getActor(gameState);
@@ -554,12 +645,6 @@ export default function App() {
     });
   };
 
-  const handleMayorReveal = (mayorId) => {
-    const mayor = gameState.players.find(p => p.id === mayorId && p.role === 'MAYOR' && p.alive);
-    if (!mayor || (gameState.mayorRevealedIds || []).includes(mayorId)) return;
-    setGameState(prev => ({ ...prev, mayorRevealedIds: [...(prev.mayorRevealedIds || []), mayorId], gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', `Mayor ${mayor.name} mengungkap identitas. Suaranya bernilai 2.`) }));
-  };
-
   // Setiap Doppelganger yang targetnya sudah mati menyalin role target. Kemampuan sekali-pakai
   // dicatat per id pemain, jadi hasil salinan otomatis mendapat kemampuan "segar".
   function applyDoppelgangerCopies(state, playersIn, logIn, night, day) {
@@ -568,7 +653,6 @@ export default function App() {
     let log = logIn;
     const notices = [];
     const abilityUsed = { ...(state.abilityUsed || {}) };
-    let mayorRevealedIds = [...(state.mayorRevealedIds || [])];
     playersIn.filter(p => p.role === 'DOPPELGANGER' && p.alive && !p.doppelgangerCopied).forEach(doppel => {
       const targetId = targets[doppel.id];
       const target = targetId ? players.find(p => p.id === targetId) : null;
@@ -577,30 +661,30 @@ export default function App() {
       const idx = players.findIndex(p => p.id === doppel.id);
       players[idx] = {
         ...players[idx], role: copiedRole,
-        team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' }),
+        team: getEffectiveTeam({ role: copiedRole, convertedToWerewolf: copiedRole === 'WEREWOLF' || copiedRole === 'WOLF_CUB' || copiedRole === 'ALPHA_WOLF' }),
         doppelgangerCopied: true
       };
       delete abilityUsed[doppel.id];
-      mayorRevealedIds = mayorRevealedIds.filter(id => id !== doppel.id);
       log = addLog(log, night, day, 'ACTION', `⚠️ PENGINGAT MODERATOR: Target Doppelganger (${target.name}) telah mati. Doppelganger (${doppel.name}) resmi mewarisi role ${ROLES[copiedRole]?.name}!`);
       notices.push({ playerId: doppel.id, playerName: doppel.name, targetName: target.name, oldRole: doppel.role, newRole: copiedRole });
     });
-    return { players, log, notices, patch: { abilityUsed, mayorRevealedIds } };
+    return { players, log, notices, patch: { abilityUsed } };
   }
 
   const resolveVotingResults = () => {
     let log = [...gameState.gameLog];
     const { players, nightNumber, dayNumber } = gameState;
-    const { counts: voteCounts, total: validVoteCount } = computeVoteCounts(gameState);
+    const { counts: voteCounts, total: validVoteCount, skip: skipCount } = computeVoteCounts(gameState);
 
     const maxVotes = Math.max(0, ...Object.values(voteCounts));
     const topCandidates = maxVotes > 0 ? Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes) : [];
-    const allVotesSkipped = validVoteCount === 0;
+    // Suara tertinggi <= suara skip  =>  skip, tidak ada yang tereliminasi
+    const skipWins = maxVotes <= skipCount;
 
     let updatedPlayers = players.map(p => ({ ...p }));
     let dayDeaths = [], loverDeathNotice = [], dopNotices = [], dopPatch = {};
 
-    if (topCandidates.length === 1) {
+    if (!skipWins && topCandidates.length === 1) {
       const eliminatedPlayer = updatedPlayers.find(p => p.id === topCandidates[0]);
       log = addLog(log, nightNumber, dayNumber, 'ACTION', `${eliminatedPlayer.name} tereliminasi (${maxVotes} suara).`);
       const res = applyDeathsWithLovers(updatedPlayers, log, [{ id: eliminatedPlayer.id, reason: 'VOTE' }], nightNumber, dayNumber, { deathDay: dayNumber });
@@ -613,7 +697,7 @@ export default function App() {
         setGameState({ ...gameState, undoStack: pushUndoState(gameState), players: updatedPlayers, gameLog: log, lastDayDeaths: dayDeaths, loverDeathNotice, doppelgangerNotices: [], currentPhase: 'GAME_OVER', winner: 'JESTER' });
         return;
       }
-    } else if (allVotesSkipped) log = addLog(log, nightNumber, dayNumber, 'INFO', `Semua pemain SKIP VOTE.`);
+    } else if (skipWins) log = addLog(log, nightNumber, dayNumber, 'INFO', validVoteCount === 0 && skipCount === 0 ? 'Semua pemain SKIP VOTE.' : `SKIP menang (${skipCount} suara skip ≥ ${maxVotes} suara tertinggi). Tidak ada yang tereliminasi.`);
     else log = addLog(log, nightNumber, dayNumber, 'INFO', `Hasil voting seri!`);
 
     let tempState = {
@@ -641,14 +725,19 @@ export default function App() {
     const shuffledRoles = shuffle(roleList);
     const stamp = Date.now();
     const newPlayers = playerNames.map((name, idx) => ({ id: 'player_' + (idx + 1) + '_' + stamp, name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false, convertedToWerewolf: false }));
-    setGameState({ ...createInitialGameState(), players: newPlayers, roleCounts: { ...roleCounts }, fakePhasesEnabled: gameState.fakePhasesEnabled !== false, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
+    setGameState({ ...createInitialGameState(), players: newPlayers, roleCounts: { ...roleCounts }, fakePhasesEnabled: gameState.fakePhasesEnabled !== false, eventsEnabled: !!gameState.eventsEnabled, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
   };
 
   const handleBackToHome = () => {
     const inGame = gameState.players.length > 0 && !['HOME', 'SETUP', 'GAME_OVER'].includes(gameState.currentPhase);
     if (inGame) {
       // Game dijeda (tidak dihapus) dan bisa dilanjutkan dari tombol "LANJUTKAN GAME"
-      setGameState(prev => ({ ...prev, resumePhase: prev.currentPhase, currentPhase: 'HOME', isRoleCardOpen: false }));
+      setGameState(prev => {
+        // Timer diskusi ikut dijeda agar tidak habis selagi game ada di Home.
+        const pauseTimer = prev.currentPhase === 'DISCUSSION' && prev.discussionEndTimestamp && !prev.isTimerPaused;
+        return { ...prev, resumePhase: prev.currentPhase, currentPhase: 'HOME', isRoleCardOpen: false,
+          ...(pauseTimer ? { isTimerPaused: true, pausedRemainingSeconds: Math.max(0, Math.ceil((prev.discussionEndTimestamp - Date.now()) / 1000)) } : {}) };
+      });
       return;
     }
     try { localStorage.removeItem(LOCAL_STORAGE_KEY); } catch (e) {}
@@ -669,7 +758,7 @@ export default function App() {
       NIGHT_INTRO: [`MALAM ${gameState.nightNumber}`, 'Semua pemain tutup mata.', 'NEXT: Mulai aksi malam.'],
       MORNING: [`PAGI ${gameState.dayNumber}`, `${(gameState.lastNightDeaths || []).length} pemain tereliminasi.`, 'NEXT: Masuk diskusi.'],
       DISCUSSION: ['DISKUSI', gameState.discussionEndTimestamp ? `Timer ${formatTime(remainingSeconds)} tersisa.` : 'Timer belum dimulai.', 'NEXT: Selesaikan untuk voting.'],
-      VOTING: ['VOTING', `${computeVoteCounts({ ...gameState, mayorRevealedIds: [] }).total}/${living.length} suara tercatat.`, 'NEXT: Proses hasil voting.'],
+      VOTING: ['VOTING', `${(() => { const v = computeVoteCounts(gameState); return v.total + v.skip; })()}/${living.length} suara tercatat.`, 'NEXT: Proses hasil voting.'],
       HUNTER_REVENGE: ['HUNTER REVENGE', 'Hunter membalas dendam.', 'NEXT: Pilih target hidup.'],
       GAME_OVER: ['GAME OVER', 'Permainan selesai.', 'NEXT: Mulai game baru.']
     };
@@ -791,6 +880,10 @@ export default function App() {
           <input type="checkbox" checked={fakeDraft} onChange={e => setFakeDraft(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-500" />
           <span><span className="block text-sm font-bold text-white">Fase palsu</span><span className="block text-[11px] text-slate-400">Role yang sudah mati / kemampuannya habis tetap "dipanggil" dengan jeda acak, jadi pemain tidak bisa menebak dari jeda.</span></span>
         </label>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={eventsDraft} onChange={e => setEventsDraft(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-500" />
+          <span><span className="block text-sm font-bold text-white">Kejadian acak (event desa)</span><span className="block text-[11px] text-slate-400">Mulai Malam 2, moderator menarik kartu: Gerhana (hasil Seer acak), Bulan Darah (Werewolf boleh 2 korban), Kabut (besok tanpa voting), atau malam tenang.</span></span>
+        </label>
       </div>
       {setupIssues.length > 0 && (
         <div className="rounded-2xl border border-red-800/60 bg-red-950/40 p-3 space-y-1">
@@ -812,7 +905,7 @@ export default function App() {
           const roleList = Object.entries(roleCountsDraft).flatMap(([role, count]) => Array(Number(count)).fill(role));
           const shuffledRoles = shuffle(roleList);
           const players = trimmed.map((name, idx) => ({ id: 'player_' + (idx + 1) + '_' + Date.now(), name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false, convertedToWerewolf: false }));
-          setGameState({ ...createInitialGameState(), players, currentPhase: 'ROLE_SUMMARY', roleCounts: { ...roleCountsDraft }, fakePhasesEnabled: fakeDraft, gameLog: addLog([], 1, 1, 'INFO', `Permainan dibuat dengan ${playerCount} pemain.`) });
+          setGameState({ ...createInitialGameState(), players, currentPhase: 'ROLE_SUMMARY', roleCounts: { ...roleCountsDraft }, fakePhasesEnabled: fakeDraft, eventsEnabled: eventsDraft, gameLog: addLog([], 1, 1, 'INFO', `Permainan dibuat dengan ${playerCount} pemain.`) });
         }} disabled={!canStart} className="w-2/3 py-3.5 disabled:opacity-40 disabled:cursor-not-allowed rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition">
           <Sparkles className="w-5 h-5" /><span>ACAK ROLE</span>
         </button>
@@ -909,42 +1002,96 @@ export default function App() {
 
   const renderNightWerewolf = () => {
     const livingCandidates = gameState.players.filter(p => p.alive && !isWolfAligned(p));
-    const rage = gameState.wolfCubRagePending; const required = Math.min(rage ? 2 : 1, livingCandidates.length);
+    const rage = gameState.wolfCubRagePending;
+    const bloodMoon = isEventTonight(gameState, 'BLOOD_MOON');
+    const alpha = alphaAvailable(gameState);
+    const convertMode = gameState.werewolfMode === 'CONVERT' && !!alpha;
+    const { min, max } = convertMode ? { min: 1, max: 1 } : wolfLimits(gameState);
     const selectedIds = gameState.werewolfTargetIds || (gameState.werewolfTargetId ? [gameState.werewolfTargetId] : []);
+    const canConfirm = selectedIds.length >= min && selectedIds.length <= max;
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-red-950/90 border border-red-700/60 text-red-400 shadow-lg"><PawPrint className="w-8 h-8" /></div>
           <h2 className="text-2xl font-black text-red-400">WEREWOLF PHASE</h2>
-          {rage && (
+          {rage && !convertMode && (
             <div className="inline-block px-3 py-1 bg-red-600 text-white font-black text-xs rounded-full animate-bounce shadow-md my-1">
               🐺 WOLF CUB RAGE! (PILIH 2 KORBAN)
             </div>
           )}
-          <p className="text-xs sm:text-sm text-slate-300">Pilih {required} pemain untuk dieliminasi.</p>
+          {bloodMoon && !rage && !convertMode && (
+            <div className="inline-block px-3 py-1 bg-rose-800 text-white font-black text-xs rounded-full shadow-md my-1">🩸 BULAN DARAH: boleh pilih sampai 2 korban</div>
+          )}
+          {alpha && (
+            <div className="flex justify-center gap-2 pt-1">
+              <button onClick={() => handleSetWerewolfMode('KILL')} className={`px-3 py-1.5 rounded-full text-[11px] font-black border transition ${!convertMode ? 'bg-red-700 border-red-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>SERANG</button>
+              <button onClick={() => handleSetWerewolfMode('CONVERT')} className={`px-3 py-1.5 rounded-full text-[11px] font-black border transition ${convertMode ? 'bg-red-700 border-red-500 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>👑 TULARI (Alpha, sekali)</button>
+            </div>
+          )}
+          <p className="text-xs sm:text-sm text-slate-300">{convertMode ? 'Pilih 1 pemain untuk ditulari. Korban tidak mati, diam-diam pindah ke tim Werewolf.' : min === max ? `Pilih ${max} pemain untuk dieliminasi.` : `Pilih ${min}–${max} pemain untuk dieliminasi.`}</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
-          {livingCandidates.map(player => { 
-            const isSelected = selectedIds.includes(player.id); 
+          {livingCandidates.map(player => {
+            const isSelected = selectedIds.includes(player.id);
             return (
-              <button key={player.id} onClick={() => setGameState(prev => { 
-                const current = prev.werewolfTargetIds || []; 
-                if (required > 1) { 
-                  const next = current.includes(player.id) ? current.filter(x => x !== player.id) : current.length < 2 ? [...current, player.id] : [current[1], player.id]; 
-                  return { ...prev, werewolfTargetIds: next, werewolfTargetId: next[0] || null }; 
-                } 
-                return { ...prev, werewolfTargetIds: [player.id], werewolfTargetId: player.id }; 
+              <button key={player.id} onClick={() => setGameState(prev => {
+                const current = prev.werewolfTargetIds || [];
+                if (max > 1) {
+                  const next = current.includes(player.id) ? current.filter(x => x !== player.id) : current.length < max ? [...current, player.id] : [current[1], player.id];
+                  return { ...prev, werewolfTargetIds: next, werewolfTargetId: next[0] || null };
+                }
+                return { ...prev, werewolfTargetIds: [player.id], werewolfTargetId: player.id };
               })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-red-950/80 border-red-500 text-red-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}>
                 <span className="truncate">{player.name}</span>
                 {isSelected && <Crosshair className="w-4 h-4 text-red-400 shrink-0" />}
               </button>
-            ); 
+            );
           })}
         </div>
         <div className="flex gap-3">
           <button onClick={() => handleSkipNightAction('WEREWOLF', 'Werewolf SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button>
-          <button onClick={() => handleConfirmWerewolf(selectedIds)} disabled={selectedIds.length !== required} className="w-2/3 disabled:opacity-40 py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI TARGET</span><ArrowRight className="w-5 h-5" /></button>
+          <button onClick={() => handleConfirmWerewolf(selectedIds)} disabled={!canConfirm} className="w-2/3 disabled:opacity-40 py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI TARGET</span><ArrowRight className="w-5 h-5" /></button>
         </div>
+      </div>
+    );
+  };
+
+  const renderNightIllusionist = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-fuchsia-950/90 border border-fuchsia-700/60 text-fuchsia-300 shadow-lg"><EyeOff className="w-8 h-8" /></div><h2 className="text-2xl font-black text-fuchsia-300">ILLUSIONIST PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Sekali per game: pilih 1 pemain, kemampuan malamnya diblokir malam ini. Jalankan fasenya seperti biasa; targetnya tidak diberi tahu.</p></div>
+        {actorBanner(actor)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
+          {getLivingTargets(gameState, 'ILLUSIONIST', actor?.id).map(player => { const isSelected = draft.targetId === player.id; return <button key={player.id} onClick={() => setDraft({ targetId: player.id })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-fuchsia-950/80 border-fuchsia-500 text-fuchsia-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <EyeOff className="w-4 h-4 text-fuchsia-300 shrink-0" />}</button>; })}
+        </div>
+        <div className="flex gap-3"><button onClick={() => handleSkipNightAction('ILLUSIONIST', 'Illusionist SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={handleConfirmIllusionist} disabled={!draft.targetId} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-fuchsia-700 to-fuchsia-600 hover:from-fuchsia-600 hover:to-fuchsia-500 disabled:opacity-40 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI BLOKIR</span><ArrowRight className="w-5 h-5" /></button></div>
+      </div>
+    );
+  };
+
+  const renderNightEvent = () => {
+    const drawn = gameState.eventDrawnNight === gameState.nightNumber;
+    const ev = drawn && isEventTonight(gameState, gameState.activeEvent?.type) ? EVENT_INFO[gameState.activeEvent.type] : null;
+    return (
+      <div className="max-w-md mx-auto p-6 min-h-[70vh] flex flex-col justify-between text-center space-y-6 animate-fadeIn">
+        <div className="space-y-4 pt-6">
+          <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Info khusus moderator</span>
+          <h2 className="text-2xl font-black text-white uppercase tracking-wide">KEJADIAN DESA</h2>
+          {!drawn ? (
+            <div className="mx-auto w-48 aspect-[3/4] rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 flex items-center justify-center shadow-2xl"><span className="text-5xl">🃏</span></div>
+          ) : (
+            <div className="wf-pop rounded-3xl border-2 border-amber-600/50 bg-slate-900/90 p-6 space-y-3 shadow-2xl">
+              <div className="text-5xl">{ev ? ev.emoji : '🌙'}</div>
+              <h3 className="text-xl font-black text-amber-300 uppercase">{ev ? ev.name : 'Malam Tenang'}</h3>
+              <p className="text-sm text-slate-300 leading-relaxed">{ev ? ev.text : 'Tidak ada kejadian khusus malam ini.'}</p>
+            </div>
+          )}
+        </div>
+        {!drawn
+          ? <button onClick={handleDrawEvent} className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-xl transition">TARIK KARTU KEJADIAN</button>
+          : <button onClick={() => advanceNightPhase()} className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT KE AKSI MALAM</span><ArrowRight className="w-5 h-5" /></button>}
       </div>
     );
   };
@@ -1082,7 +1229,7 @@ export default function App() {
 
   const renderMorning = () => (
     <div className="max-w-lg mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
-      <div className="space-y-3 pt-4"><div className="inline-flex items-center justify-center p-4 rounded-3xl bg-amber-950/80 border border-amber-600/50 text-amber-400 shadow-2xl"><Sun className="w-12 h-12" /></div><h2 className="text-3xl font-black text-white">PAGI HARI {gameState.dayNumber}</h2><p className="text-xs sm:text-sm text-slate-300">Matahari telah terbit di desa.</p></div>
+      <div className="space-y-3 pt-4"><div className="inline-flex items-center justify-center p-4 rounded-3xl bg-amber-950/80 border border-amber-600/50 text-amber-400 shadow-2xl"><Sun className="w-12 h-12" /></div><h2 className="text-3xl font-black text-white">PAGI HARI {gameState.dayNumber}</h2><p className="text-xs sm:text-sm text-slate-300">Matahari telah terbit di desa.</p>{isFogDay(gameState) && <div className="inline-block px-3 py-1 rounded-full bg-slate-700 text-slate-100 text-xs font-black">🌫️ Kabut turun: hari ini tidak ada voting</div>}</div>
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
         {(gameState.lastNightDeaths || []).length === 0 ? (
           <div className="space-y-2"><Sun className="w-10 h-10 text-emerald-400 mx-auto" /><h3 className="text-xl font-black text-emerald-400">Semua Pemain Selamat!</h3><p className="text-xs text-slate-300">Semalam tidak ada pemain yang tereliminasi.</p></div>
@@ -1096,16 +1243,16 @@ export default function App() {
 
   const renderDiscussion = () => (
     <div className="max-w-lg mx-auto p-4 sm:p-6 text-center space-y-6 animate-fadeIn">
-      <div className="space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-950/90 border border-orange-700/60 text-orange-400 shadow-lg"><MessageSquare className="w-8 h-8" /></div><h2 className="text-2xl font-black text-white">WAKTU DISKUSI</h2></div>
+      <div className="space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-orange-950/90 border border-orange-700/60 text-orange-400 shadow-lg"><MessageSquare className="w-8 h-8" /></div><h2 className="text-2xl font-black text-white">WAKTU DISKUSI</h2>{isFogDay(gameState) && <div className="inline-block px-3 py-1 rounded-full bg-slate-700 text-slate-100 text-xs font-black">🌫️ KABUT: hari ini tidak ada voting</div>}</div>
       <div className="bg-slate-900/90 border-2 border-slate-800/80 rounded-3xl p-8 space-y-4 shadow-2xl"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SISA WAKTU DISKUSI</span><div className="text-5xl sm:text-6xl font-black font-mono text-amber-400 tracking-wider">{formatTime(remainingSeconds)}</div><div className="flex items-center justify-center gap-3 pt-2">{!gameState.discussionEndTimestamp ? <button onClick={startDiscussionTimer} className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center gap-2 shadow-lg transition"><Play className="w-4 h-4 fill-current" /><span>MULAI TIMER</span></button> : !gameState.isTimerPaused ? <button onClick={pauseDiscussionTimer} className="px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-sm flex items-center gap-2 border border-slate-700 transition"><Pause className="w-4 h-4" /><span>PAUSE</span></button> : <button onClick={resumeDiscussionTimer} className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center gap-2 shadow-lg transition"><Play className="w-4 h-4 fill-current" /><span>RESUME</span></button>}</div></div>
-      <button onClick={triggerAutoTransitionToVoting} className="w-full py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition"><span>SELESAIKAN DISKUSI DAN MULAI VOTING</span><ArrowRight className="w-4 h-4" /></button>
+      <button onClick={triggerAutoTransitionToVoting} className="w-full py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition"><span>{isFogDay(gameState) ? 'AKHIRI HARI (KABUT, TANPA VOTING)' : 'SELESAIKAN DISKUSI DAN MULAI VOTING'}</span><ArrowRight className="w-4 h-4" /></button>
     </div>
   );
 
   const handleSaveVotes = () => {
     const livingCount = gameState.players.filter(p => p.alive).length;
-    const { total } = computeVoteCounts({ ...gameState, mayorRevealedIds: [] });
-    if (total > livingCount) { setVoteError(`Total suara (${total}) melebihi jumlah pemain hidup (${livingCount}).`); return; }
+    const { total, skip } = computeVoteCounts(gameState);
+    if (total + skip > livingCount) { setVoteError(`Total suara (${total + skip}, termasuk skip) melebihi jumlah pemain hidup (${livingCount}).`); return; }
     setVoteError('');
     setGameState(prev => ({ ...prev, undoStack: pushUndoState(prev), voteRecorded: true, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'ACTION', 'Moderator memasukkan rekapitulasi hasil voting.') }));
   };
@@ -1113,18 +1260,15 @@ export default function App() {
   const renderVoting = () => {
     const livingPlayers = gameState.players.filter(p => p.alive);
     const hasVotesRecorded = !!gameState.voteRecorded;
-    const { counts: voteTally } = computeVoteCounts(gameState);
-    const rawTotal = computeVoteCounts({ ...gameState, mayorRevealedIds: [] }).total;
-    const aliveMayors = gameState.players.filter(p => p.role === 'MAYOR' && p.alive);
-    const revealedMayorIds = gameState.mayorRevealedIds || [];
-    const unrevealedMayors = aliveMayors.filter(m => !revealedMayorIds.includes(m.id));
-    const revealedMayors = aliveMayors.filter(m => revealedMayorIds.includes(m.id));
+    const { counts: voteTally, total: rawTotal, skip: skipCount } = computeVoteCounts(gameState);
 
     const sortedCandidates = Object.entries(voteTally)
       .map(([targetId, count]) => ({ player: gameState.players.find(p => p.id === targetId), count }))
       .filter(item => item.player)
       .sort((a, b) => b.count - a.count);
     const maxVotes = sortedCandidates.length > 0 ? sortedCandidates[0].count : 0;
+    // Suara tertinggi <= suara skip  =>  skip, tidak ada yang tereliminasi
+    const skipWins = maxVotes <= skipCount;
 
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
@@ -1136,30 +1280,20 @@ export default function App() {
           <p className="text-xs text-slate-400">Masukkan jumlah perolehan suara secara langsung untuk masing-masing pemain.</p>
         </div>
 
-        {unrevealedMayors.map(m => (
-          <button key={m.id} onClick={() => handleMayorReveal(m.id)} className="w-full py-3 rounded-2xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm shadow-md transition flex items-center justify-center gap-2">
-            <Crown className="w-4 h-4" /> UNGKAP IDENTITAS MAYOR ({m.name})
-          </button>
-        ))}
-
-        {!hasVotesRecorded && revealedMayors.map(m => (
-          <div key={m.id} className="bg-slate-900/90 border border-amber-800/60 rounded-2xl p-4 space-y-2">
-            <label className="text-[10px] font-black text-amber-300 uppercase tracking-widest block">Mayor {m.name} memilih siapa? (bobot 2 suara)</label>
-            <select value={(gameState.mayorVotes || {})[m.id] || ''} onChange={e => setGameState(prev => ({ ...prev, mayorVotes: { ...(prev.mayorVotes || {}), [m.id]: e.target.value || null } }))} className="w-full py-2.5 px-3 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white focus:outline-none">
-              <option value="">-- Mayor skip / tidak memilih --</option>
-              {livingPlayers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <p className="text-[10px] text-slate-400">Suara biasa Mayor tetap dihitung di input di bawah; sistem otomatis menambah +1 untuk pilihannya.</p>
-          </div>
-        ))}
-
         {!hasVotesRecorded ? (
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 space-y-4 shadow-xl">
             <div className="flex justify-between items-center mb-2">
-              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">Input Perolehan Suara Kandidat:</div>
-              <div className={`text-xs font-black ${rawTotal > livingPlayers.length ? 'text-red-400' : 'text-amber-400'}`}>{rawTotal} / {livingPlayers.length}</div>
+              <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">Input Perolehan Suara:</div>
+              <div className={`text-xs font-black ${rawTotal + skipCount > livingPlayers.length ? 'text-red-400' : 'text-amber-400'}`}>{rawTotal + skipCount} / {livingPlayers.length}</div>
             </div>
             <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+              <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-amber-950/30 border border-amber-800/50">
+                <div className="min-w-0"><span className="block text-sm font-bold text-amber-300">SKIP</span><span className="block text-[10px] text-slate-400">Jika suara tertinggi ≤ suara skip, tidak ada yang tereliminasi.</span></div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 uppercase">Suara:</span>
+                  <input type="number" min="0" max={livingPlayers.length} value={gameState.skipVotes ?? ''} onChange={e => { const val = e.target.value; setVoteError(''); setGameState(prev => ({ ...prev, skipVotes: val })); }} placeholder="0" className="w-16 px-2.5 py-1.5 bg-slate-900 border border-amber-700 rounded-xl text-center text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-500" />
+                </div>
+              </div>
               {livingPlayers.map(target => (
                 <div key={target.id} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
                   <span className="text-sm font-bold text-white truncate">{target.name}</span>
@@ -1198,25 +1332,33 @@ export default function App() {
               </button>
             </div>
             <div className="space-y-3">
-              {sortedCandidates.length === 0 ? (
+              {sortedCandidates.length === 0 && skipCount === 0 && (
                 <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">Tidak ada suara tercatat. Semua pemain skip.</div>
-              ) : (
-                sortedCandidates.map(({ player, count }) => {
-                  const isTop = count === maxVotes && maxVotes > 0;
-                  const percentage = Math.min(100, (count / Math.max(1, livingPlayers.length)) * 100);
-                  return (
-                    <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500/80' : 'bg-slate-950/80 border-slate-800/80'}`}>
-                      <div className="flex justify-between items-center text-sm font-bold">
-                        <span className={isTop ? 'text-red-400' : 'text-white'}>{player.name}</span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isTop ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{count} Suara</span>
-                      </div>
-                      <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${isTop ? 'bg-gradient-to-r from-red-600 to-amber-500' : 'bg-slate-600'}`} style={{ width: `${Math.max(8, percentage)}%` }} />
-                      </div>
-                    </div>
-                  );
-                })
               )}
+              {skipCount > 0 && (
+                <div className={`p-3.5 rounded-2xl border space-y-2 transition ${skipWins ? 'bg-amber-950/40 border-amber-500/80' : 'bg-slate-950/80 border-slate-800/80'}`}>
+                  <div className="flex justify-between items-center text-sm font-bold">
+                    <span className={skipWins ? 'text-amber-300' : 'text-white'}>SKIP</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${skipWins ? 'bg-amber-600 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>{skipCount} Suara</span>
+                  </div>
+                </div>
+              )}
+              {sortedCandidates.map(({ player, count }) => {
+                const isTop = count === maxVotes && maxVotes > 0 && !skipWins;
+                const percentage = Math.min(100, (count / Math.max(1, livingPlayers.length)) * 100);
+                return (
+                  <div key={player.id} className={`p-3.5 rounded-2xl border space-y-2 transition ${isTop ? 'bg-red-950/40 border-red-500/80' : 'bg-slate-950/80 border-slate-800/80'}`}>
+                    <div className="flex justify-between items-center text-sm font-bold">
+                      <span className={isTop ? 'text-red-400' : 'text-white'}>{player.name}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${isTop ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'}`}>{count} Suara</span>
+                    </div>
+                    <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${isTop ? 'bg-gradient-to-r from-red-600 to-amber-500' : 'bg-slate-600'}`} style={{ width: `${Math.max(8, percentage)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {skipWins && skipCount > 0 && <p className="text-center text-xs font-bold text-amber-300">SKIP menang ({skipCount} ≥ {maxVotes}): tidak ada yang tereliminasi.</p>}
             </div>
             <button onClick={resolveVotingResults} className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 transition">
               <span>PROSES HASIL VOTING</span><ArrowRight className="w-5 h-5" />
@@ -1229,17 +1371,27 @@ export default function App() {
 
   const renderDoppelgangerReveal = () => {
     const notices = gameState.doppelgangerNotices || [];
+    const onlyDoppel = notices.every(n => n.kind !== 'CONVERT');
     return (
       <div className="max-w-md mx-auto p-6 min-h-[70vh] flex flex-col justify-between text-center space-y-6 animate-fadeIn">
         <div className="space-y-4 pt-6">
           <div className="inline-flex items-center justify-center p-4 rounded-3xl bg-indigo-950/90 border border-indigo-700/60 text-indigo-300 shadow-2xl"><Ghost className="w-12 h-12" /></div>
-          <h2 className="text-2xl font-black text-indigo-300 uppercase tracking-wide">DOPPELGANGER BERUBAH</h2>
+          <h2 className="text-2xl font-black text-indigo-300 uppercase tracking-wide">{onlyDoppel ? 'DOPPELGANGER BERUBAH' : 'PERUBAHAN ROLE / TIM'}</h2>
           <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Info khusus moderator</p>
-          {notices.map(notice => {
+          {notices.map((notice, i) => {
+            if (notice.kind === 'CONVERT') {
+              return (
+                <div key={`${notice.playerId}_${i}`} className="rounded-3xl border-2 border-red-600/60 bg-red-950/90 p-5 space-y-3">
+                  <PawPrint className="w-12 h-12 mx-auto text-red-400" />
+                  <p className="text-sm text-slate-200"><strong>{notice.playerName}</strong> kini menjadi <strong>Werewolf</strong>{notice.cause === 'CURSED' ? ' (Cursed diserang Werewolf).' : ' (ditulari Alpha Wolf).'}</p>
+                  <p className="text-xs text-amber-300">Masih malam: bangunkan {notice.playerName} diam-diam, beri tahu, lalu kenalkan ke pack.</p>
+                </div>
+              );
+            }
             const newMeta = ROLES[notice.newRole] || ROLES.WARGA;
             const NewIcon = ROLE_ICONS[notice.newRole] || Ghost;
             return (
-              <div key={notice.playerId} className={`rounded-3xl border-2 ${newMeta.border} ${newMeta.bg} p-5 space-y-3`}>
+              <div key={`${notice.playerId}_${i}`} className={`rounded-3xl border-2 ${newMeta.border} ${newMeta.bg} p-5 space-y-3`}>
                 <p className="text-sm text-slate-200"><strong>{notice.playerName}</strong> menyalin role dari <strong>{notice.targetName}</strong> yang telah mati.</p>
                 <NewIcon className={`w-12 h-12 mx-auto ${newMeta.color}`} />
                 <p className={`text-xl font-black uppercase ${newMeta.color}`}>{newMeta.name}</p>
@@ -1293,6 +1445,8 @@ export default function App() {
       case 'NIGHT_WEREWOLF': return renderNightWerewolf();
       case 'NIGHT_GUARDIAN': return renderNightGuardian();
       case 'NIGHT_BODYGUARD': return renderNightBodyguard();
+      case 'NIGHT_ILLUSIONIST': return renderNightIllusionist();
+      case 'NIGHT_EVENT': return renderNightEvent();
       case 'NIGHT_FAKE': return renderNightFake();
       case 'NIGHT_SHERIFF': return renderNightSheriff();
       case 'NIGHT_DOPPELGANGER': return renderNightDoppelganger();
@@ -1366,7 +1520,7 @@ export default function App() {
                   <div key={p.id} className={`p-3 rounded-2xl border ${p.alive ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-950/30 border-slate-900 opacity-60'} flex items-center justify-between`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${meta.bg} border ${meta.border}`}><Icon className={`w-4 h-4 ${meta.color}`} /></div>
-                      <div><h4 className="font-bold text-white text-sm">{p.name}</h4><span className={`text-[10px] font-black ${meta.color}`}>{meta.name}</span></div>
+                      <div><h4 className="font-bold text-white text-sm">{p.name}</h4><span className={`text-[10px] font-black ${meta.color}`}>{meta.name}</span>{isWolfAligned(p) && !['WEREWOLF', 'WOLF_CUB', 'ALPHA_WOLF'].includes(p.role) && <span className="ml-1.5 text-[10px] font-black text-red-400">→ Werewolf (tertular)</span>}</div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${p.alive ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' : 'bg-red-950/80 text-red-400 border-red-900'}`}>{p.alive ? 'Hidup' : 'Mati'}</span>
                   </div>
@@ -1397,6 +1551,7 @@ export default function App() {
             <div className="p-5 border-b border-slate-800 flex items-center justify-between"><div className="flex items-center gap-2 text-amber-400 font-bold text-base"><BookOpen className="w-5 h-5" /><span>Panduan Aturan Werewolf</span></div><button onClick={() => setShowRulesModal(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"><X className="w-5 h-5" /></button></div>
             <div className="p-5 overflow-y-auto space-y-4 text-sm text-slate-300">
               <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2"><h4 className="font-bold text-amber-300 text-sm flex items-center gap-2"><Crown className="w-4 h-4" /> Tujuan Permainan</h4><p>• <strong>Tim Warga:</strong> Eliminasi seluruh role Evil.</p><p>• <strong>Tim Werewolf:</strong> Menang jika jumlah Werewolf lebih banyak atau sama dengan dari jumlah pemain non-Evil.</p><p>• <strong>Lovers beda tim:</strong> Jika pasangan Lovers terdiri dari Werewolf dan non-Werewolf, mereka menang bersama bila hanya mereka berdua yang tersisa.</p></section>
+              <section className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-2"><h4 className="font-bold text-amber-300 text-sm">Voting & Kejadian</h4><p>• <strong>Skip:</strong> jika suara tertinggi ≤ suara skip, tidak ada yang tereliminasi.</p><p>• <strong>Kejadian acak (opsional):</strong> 🌘 Gerhana (hasil Seer acak), 🩸 Bulan Darah (Werewolf boleh 2 korban), 🌫️ Kabut (tidak ada voting di siang berikutnya).</p></section>
               <section className="space-y-2.5"><h4 className="font-bold text-white text-sm">Aturan Peran</h4>{Object.entries(ROLES).map(([key, role]) => { const Icon = ROLE_ICONS[key] || User; return <div key={key} className={`p-3 rounded-2xl border ${role.border} ${role.bg} flex items-start gap-3 shadow-md`}><Icon className={`w-6 h-6 ${role.color} mt-1`} /><div><span className={`font-black ${role.color}`}>{role.name} ({role.team})</span><p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{role.desc}</p></div></div>; })}</section>
             </div>
           </div>
