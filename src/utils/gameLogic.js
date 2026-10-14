@@ -151,6 +151,11 @@ function secureRandomInt(maxExclusive) {
   );
 }
 
+/** Bilangan acak aman 0..maxExclusive-1 (dipakai untuk jeda fase palsu). */
+export function randomInt(maxExclusive) {
+  return secureRandomInt(maxExclusive);
+}
+
 /**
  * Fisher–Yates Shuffle.
  *
@@ -217,49 +222,52 @@ export function createInitialGameState() {
     stateVersion: GAME_STATE_VERSION,
     players: [],
     currentPhase: 'HOME',
-    resumePhase: null,
     nightNumber: 1,
     dayNumber: 1,
-
-    // Timer diskusi
     discussionEndTimestamp: null,
     discussionDurationSeconds: 300,
     isTimerPaused: false,
     pausedRemainingSeconds: null,
-
-    // Aksi malam (dikunci per pemain pelaku agar role ganda didukung)
-    nightActs: {},
-    nightActorId: null,
-    draft: {},
-    nightSkips: {},
     werewolfTargetId: null,
     werewolfTargetIds: [],
     wolfCubRagePending: false,
-    guardianLast: {},
+    guardianTargetId: null,
+    sheriffTargetId: null,
+    sheriffUsed: false,
+    sheriffSkippedNights: [],
+    sheriffResolved: false,
+    doppelgangerTargetId: null,
+    doppelgangerCopied: false,
+    doppelgangerRoleChangeNotice: null,
+    doppelgangerRevealNextPhase: null,
+    doppelgangerRevealWinner: null,
+    mayorRevealed: false,
+    seerTargetId: null,
     seerResult: null,
-    abilityUsed: {},
-    doppelgangerTargets: {},
-
-    // Hunter / Doppelganger / Lovers
+    witchHealUsedThisNight: false,
+    witchHealTargetId: null,
+    witchKillTargetId: null,
     hunterTargetId: null,
     hunterPending: false,
-    hunterSource: null,
-    doppelgangerNotices: [],
-    doppelgangerRevealNextPhase: null,
-    loverDeathNotice: [],
-
-    // Voting
-    voteTally: {},
-    voteRecorded: false,
-    mayorRevealedIds: [],
-    mayorVotes: {},
+    cupidLover1Id: null,
+    cupidLover2Id: null,
+    witchHealUsed: false,
+    witchKillUsed: false,
+    cupidUsed: false,
+    nightSkips: {},
+    nightFakes: {},
+    fakeRole: null,
+    fakeEndTimestamp: null,
+    fakePhasesEnabled: true,
+    rolePinEnabled: false,
     currentVoterIndex: 0,
-
+    votes: {},
     revealPlayerIndex: 0,
     isRoleCardOpen: false,
     gameLog: [],
     lastNightDeaths: [],
     lastDayDeaths: [],
+    loverDeathNotice: [],
     roleCounts: {},
     winner: null,
     undoStack: []
