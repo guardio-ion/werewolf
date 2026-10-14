@@ -4,7 +4,7 @@ import {
   Heart, Skull, Users, History, BookOpen, X,
   Crown, Play, Pause, HelpCircle, Sparkles, ArrowRight, CornerUpLeft,
   Check, RefreshCw, User, PawPrint, Swords, Star, 
-  MessageSquare, CheckSquare, Ghost
+  MessageSquare, CheckSquare, Ghost, ShieldCheck, Delete
 } from 'lucide-react';
 
 import { ROLES, ROLE_KEYS } from './constants/roles';
@@ -12,21 +12,25 @@ import { GAME_PRESETS, PARTICIPANT_LIST } from './constants/presets';
 import { 
   LOCAL_STORAGE_KEY, GAME_STATE_VERSION, 
   isWolfAligned, getEffectiveTeam, normalizePlayer, loadSavedGame, 
-  shuffle, createInitialGameState, addLog, pushUndoState 
+  shuffle, createInitialGameState, addLog, pushUndoState, randomInt 
 } from './utils/gameLogic';
-import { CinematicStyles, CinematicBackdrop, PhaseTitleCard, sceneForPhase } from './components/Cinematic';
 
 const ROLE_ICONS = {
   WARGA: User, WEREWOLF: PawPrint, LYCAN: Moon, SEER: Eye, GUARDIAN: Shield,
-  CUPID: Heart, MAYOR: Crown, SHERIFF: Star, HUNTER: Crosshair, TRAITOR: Swords,
+  CUPID: Heart, BODYGUARD: ShieldCheck, MAYOR: Crown, SHERIFF: Star, HUNTER: Crosshair, TRAITOR: Swords,
   WOLF_CUB: PawPrint, WITCH: FlaskConical, JESTER: Sparkles, DOPPELGANGER: Ghost
 };
 
 const DEATH_REASON_LABELS = {
   WEREWOLF: 'Diserang Werewolf', WITCH: 'Racun Witch', SHERIFF: 'Ditembak Sheriff',
-  SHERIFF_MISS: 'Sheriff salah tembak', LOVER: 'Ikut pasangan', HUNTER: 'Dibalas Hunter', VOTE: 'Hasil voting'
+  SHERIFF_MISS: 'Sheriff salah tembak', BODYGUARD: 'Mati menggantikan target (Bodyguard)', LOVER: 'Ikut pasangan', HUNTER: 'Dibalas Hunter', VOTE: 'Hasil voting'
 };
 
+
+// Jeda fase palsu: 6–15 detik (acak aman), supaya terasa seperti fase sungguhan.
+const FAKE_PHASE_MIN_MS = 6000;
+const FAKE_PHASE_SPREAD_MS = 9000;
+const PIN_LENGTH = 4;
 
 export default function App() {
   const [gameState, setGameState] = useState(() => {
@@ -47,6 +51,17 @@ export default function App() {
   const discussionTransitionLock = useRef(false);
   const [remainingSeconds, setRemainingSeconds] = useState(300);
   const [voteError, setVoteError] = useState('');
+  const [fakeDraft, setFakeDraft] = useState(true);
+  const [pinDraft, setPinDraft] = useState(false);
+  // Role reveal: semua state lokal (tidak disimpan ke localStorage) agar kartu tidak bocor saat reload.
+  const [isHolding, setIsHolding] = useState(false);
+  const [viewedIndex, setViewedIndex] = useState(null);
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const rolePinsRef = useRef({});
+  const wasHoldingRef = useRef(false);
+  const [fakeNow, setFakeNow] = useState(Date.now());
 
   // Saat jumlah pemain berubah: isi/seimbangkan jumlah WARGA agar total role = jumlah pemain
   useEffect(() => {
@@ -92,6 +107,45 @@ export default function App() {
     return () => clearInterval(interval);
   }, [gameState.currentPhase, gameState.discussionEndTimestamp, gameState.isTimerPaused, gameState.pausedRemainingSeconds, gameState.discussionDurationSeconds]);
 
+  // Reset seluruh state pembuka role saat pindah pemain / keluar dari fase reveal.
+  useEffect(() => {
+    wasHoldingRef.current = false;
+    setIsHolding(false); setPinUnlocked(false); setPinInput(''); setPinError('');
+    if (gameState.currentPhase !== 'ROLE_REVEAL') { rolePinsRef.current = {}; setViewedIndex(null); }
+  }, [gameState.currentPhase, gameState.revealPlayerIndex]);
+
+  // Saat kartu dilepas: tandai sudah dilihat; dengan PIN aktif, kunci lagi.
+  useEffect(() => {
+    if (wasHoldingRef.current && !isHolding) {
+      setViewedIndex(gameState.revealPlayerIndex);
+      if (gameState.rolePinEnabled) setPinUnlocked(false);
+    }
+    wasHoldingRef.current = isHolding;
+  }, [isHolding]);
+
+  // Kartu langsung tertutup jika tab disembunyikan / jendela kehilangan fokus.
+  useEffect(() => {
+    const release = () => setIsHolding(false);
+    const onVisibility = () => { if (document.hidden) release(); };
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { window.removeEventListener('blur', release); document.removeEventListener('visibilitychange', onVisibility); };
+  }, []);
+
+  // Fase palsu: tampil seperti fase role biasa, lanjut otomatis setelah jeda acak.
+  useEffect(() => {
+    if (gameState.currentPhase !== 'NIGHT_FAKE') return;
+    const role = gameState.fakeRole;
+    const wait = Math.max(0, (gameState.fakeEndTimestamp || 0) - Date.now());
+    const tick = setInterval(() => setFakeNow(Date.now()), 250);
+    const timer = setTimeout(() => finishFakePhase(role), wait);
+    return () => { clearInterval(tick); clearTimeout(timer); };
+  }, [gameState.currentPhase, gameState.fakeRole, gameState.fakeEndTimestamp]);
+
+  function finishFakePhase(role) {
+    advanceNightPhase({ fakeEndTimestamp: null, nightFakesAdd: role }, { onlyIfFake: role });
+  }
+
   function triggerAutoTransitionToVoting() {
     if (discussionTransitionLock.current) return;
     discussionTransitionLock.current = true;
@@ -116,6 +170,7 @@ export default function App() {
       case 'GUARDIAN': return players.filter(p => p.alive && (state.guardianLast || {})[actorId] !== p.id);
       case 'CUPID': return players.filter(p => p.alive && !p.loverId);
       case 'SHERIFF':
+      case 'BODYGUARD':
       case 'DOPPELGANGER':
       case 'SEER': return players.filter(p => p.alive && p.id !== actorId);
       case 'HUNTER':
@@ -135,9 +190,22 @@ export default function App() {
   const advanceNightPhase = (overrides = {}, options = {}) => {
     setGameState(prev => {
       if (prev.currentPhase === 'GAME_OVER') return prev;
-      const state = { ...prev, ...overrides };
+      // Penyelesaian fase palsu hanya berlaku sekali & hanya jika fase palsu itu masih aktif.
+      if (options.onlyIfFake && !(prev.currentPhase === 'NIGHT_FAKE' && prev.fakeRole === options.onlyIfFake)) return prev;
+      const { nightFakesAdd, ...plainOverrides } = overrides;
+      const state = { ...prev, ...plainOverrides };
+      if (nightFakesAdd) state.nightFakes = { ...(prev.nightFakes || {}), [nightFakesAdd]: true };
       const commit = options.recordUndo ? { ...state, undoStack: pushUndoState(prev) } : state;
-      const route = (phase, actor) => ({ ...commit, currentPhase: phase, nightActorId: actor ? actor.id : null });
+      const route = (phase, actor) => ({ ...commit, currentPhase: phase, nightActorId: actor ? actor.id : null, fakeRole: null, fakeEndTimestamp: null });
+      // Fase palsu: role ada di komposisi game, tetapi malam ini tidak ada aktor yang beraksi
+      // (mati / kemampuan habis / tanpa target). Ditampilkan dengan jeda acak agar urutan malam terasa sama.
+      const fakeStep = (role) => {
+        if (state.fakePhasesEnabled === false) return null;
+        if (!((state.roleCounts || {})[role] > 0)) return null;
+        if (Object.keys(getActs(state, role)).length > 0) return null;
+        if ((state.nightFakes || {})[role]) return null;
+        return { ...commit, currentPhase: 'NIGHT_FAKE', nightActorId: null, fakeRole: role, fakeEndTimestamp: Date.now() + FAKE_PHASE_MIN_MS + randomInt(FAKE_PHASE_SPREAD_MS + 1) };
+      };
 
       // Cupid: malam 1, atau Doppelganger yang sudah menyalin Cupid (sekali per aktor)
       const cupid = aliveOf(state, 'CUPID').find(p => !getActs(state, 'CUPID')[p.id] && !isUsed(state, p.id, 'CUPID') && (state.nightNumber === 1 || p.doppelgangerCopied) && getLivingTargets(state, 'CUPID', p.id).length >= 2);
@@ -156,15 +224,23 @@ export default function App() {
 
       const guardian = aliveOf(state, 'GUARDIAN').find(p => !getActs(state, 'GUARDIAN')[p.id] && getLivingTargets(state, 'GUARDIAN', p.id).length > 0);
       if (guardian) return route('NIGHT_GUARDIAN', guardian);
+      const fakeGuardian = fakeStep('GUARDIAN'); if (fakeGuardian) return fakeGuardian;
+
+      const bodyguard = aliveOf(state, 'BODYGUARD').find(p => !getActs(state, 'BODYGUARD')[p.id] && getLivingTargets(state, 'BODYGUARD', p.id).length > 0);
+      if (bodyguard) return route('NIGHT_BODYGUARD', bodyguard);
+      const fakeBodyguard = fakeStep('BODYGUARD'); if (fakeBodyguard) return fakeBodyguard;
 
       const sheriff = aliveOf(state, 'SHERIFF').find(p => !getActs(state, 'SHERIFF')[p.id] && state.nightNumber > 1 && !isUsed(state, p.id, 'SHERIFF') && getLivingTargets(state, 'SHERIFF', p.id).length > 0);
       if (sheriff) return route('NIGHT_SHERIFF', sheriff);
+      const fakeSheriff = fakeStep('SHERIFF'); if (fakeSheriff) return fakeSheriff;
 
       const seer = aliveOf(state, 'SEER').find(p => !getActs(state, 'SEER')[p.id] && getLivingTargets(state, 'SEER', p.id).length > 0);
       if (seer) return route('NIGHT_SEER', seer);
+      const fakeSeer = fakeStep('SEER'); if (fakeSeer) return fakeSeer;
 
       const witch = aliveOf(state, 'WITCH').find(p => !getActs(state, 'WITCH')[p.id] && (!isUsed(state, p.id, 'WITCH_HEAL') || (!isUsed(state, p.id, 'WITCH_KILL') && state.nightNumber > 1)));
       if (witch) return route('NIGHT_WITCH', witch);
+      const fakeWitch = fakeStep('WITCH'); if (fakeWitch) return fakeWitch;
 
       return resolveNightActions(commit);
     });
@@ -177,6 +253,8 @@ export default function App() {
     const directDeaths = [];
     const guardianActs = getActs(state, 'GUARDIAN');
     const witchActs = getActs(state, 'WITCH');
+    const bodyguardActs = getActs(state, 'BODYGUARD');
+    const usedBodyguards = new Set();
     const protectedByTown = new Set(Object.values(guardianActs).map(a => a.targetId).filter(Boolean));
     const healedSet = new Set(Object.values(witchActs).map(a => a.healTargetId).filter(Boolean));
 
@@ -186,7 +264,16 @@ export default function App() {
       if (!victimName) return;
       if (protectedByTown.has(targetId)) { log = addLog(log, night, day, 'INFO', `Serangan Werewolf pada ${victimName} berhasil dicegah Guardian.`); }
       else if (healedSet.has(targetId)) { log = addLog(log, night, day, 'INFO', `Heal Potion Witch berhasil menyelamatkan korban Werewolf.`); }
-      else { directDeaths.push({ id: targetId, reason: 'WEREWOLF' }); }
+      else {
+        // Bodyguard yang mengawal target ini mati menggantikannya (satu Bodyguard hanya bisa menggantikan sekali).
+        const guardEntry = Object.entries(bodyguardActs).find(([bgId, act]) => act && act.targetId === targetId && bgId !== targetId && !usedBodyguards.has(bgId) && updatedPlayers.some(p => p.id === bgId && p.alive));
+        if (guardEntry) {
+          const bgName = updatedPlayers.find(p => p.id === guardEntry[0])?.name;
+          usedBodyguards.add(guardEntry[0]);
+          directDeaths.push({ id: guardEntry[0], reason: 'BODYGUARD' });
+          log = addLog(log, night, day, 'ACTION', `Bodyguard ${bgName} mati menggantikan ${victimName}.`);
+        } else { directDeaths.push({ id: targetId, reason: 'WEREWOLF' }); }
+      }
     });
 
     Object.entries(getActs(state, 'SHERIFF')).forEach(([actorId, act]) => {
@@ -247,7 +334,7 @@ export default function App() {
       ...state, ...dop.patch, players: updatedPlayers, gameLog: log, lastNightDeaths: nightDeathsList,
       wolfCubRagePending: nightDeathsList.some(d => d.player.role === 'WOLF_CUB'),
       loverDeathNotice, doppelgangerNotices: dop.notices,
-      werewolfTargetId: null, werewolfTargetIds: [], nightActs: {}, draft: {}, nightActorId: null, guardianLast, seerResult: null, nightSkips: {},
+      werewolfTargetId: null, werewolfTargetIds: [], nightActs: {}, draft: {}, nightActorId: null, guardianLast, seerResult: null, nightSkips: {}, nightFakes: {}, fakeRole: null, fakeEndTimestamp: null,
     };
 
     tempState = activateTraitorIfNeeded(tempState);
@@ -412,6 +499,13 @@ export default function App() {
     advanceNightPhase({ nightActs: withAct(gameState, 'GUARDIAN', actor.id, { targetId }), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Guardian ${actor.name} mengunci target.`) }, { recordUndo: true });
   };
 
+  const handleConfirmBodyguard = () => {
+    const actor = getActor(gameState);
+    const targetId = (gameState.draft || {}).targetId;
+    if (!actor || !validateTarget(gameState, 'BODYGUARD', targetId, actor.id).valid) return;
+    advanceNightPhase({ nightActs: withAct(gameState, 'BODYGUARD', actor.id, { targetId }), draft: {}, gameLog: addLog(gameState.gameLog, gameState.nightNumber, gameState.dayNumber, 'ACTION', `Bodyguard ${actor.name} mengawal target.`) }, { recordUndo: true });
+  };
+
   const handleFinishWitch = () => {
     const actor = getActor(gameState);
     if (!actor) return;
@@ -550,7 +644,7 @@ export default function App() {
     const shuffledRoles = shuffle(roleList);
     const stamp = Date.now();
     const newPlayers = playerNames.map((name, idx) => ({ id: 'player_' + (idx + 1) + '_' + stamp, name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false, convertedToWerewolf: false }));
-    setGameState({ ...createInitialGameState(), players: newPlayers, roleCounts: { ...roleCounts }, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
+    setGameState({ ...createInitialGameState(), players: newPlayers, roleCounts: { ...roleCounts }, fakePhasesEnabled: gameState.fakePhasesEnabled !== false, rolePinEnabled: !!gameState.rolePinEnabled, currentPhase: 'ROLE_SUMMARY', gameLog: addLog([], 1, 1, 'INFO', `Game diulang.`) });
   };
 
   const handleBackToHome = () => {
@@ -601,10 +695,10 @@ export default function App() {
     <div className="min-h-[85vh] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
       <div className="max-w-md w-full space-y-8">
         <div className="space-y-4">
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl wf-glow">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-tr from-red-950 via-slate-900 to-indigo-950 border border-red-500/30 shadow-2xl">
             <Moon className="w-12 h-12 text-red-400" />
           </div>
-          <h1 className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase wf-shimmer">WEREWOLF</h1>
+          <h1 className="text-3xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-amber-200 to-purple-400 uppercase">WEREWOLF</h1>
           <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Moderator Game Assistant</p>
           <p className="text-xs sm:text-sm text-slate-300 px-4">Panduan lengkap untuk menjalankan permainan Werewolf secara otomatis dan terstruktur.</p>
         </div>
@@ -694,6 +788,17 @@ export default function App() {
           })}
         </div>
       </div>
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-3 shadow-xl">
+        <h3 className="text-xs font-bold text-slate-300 uppercase">Opsi Tambahan</h3>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={fakeDraft} onChange={e => setFakeDraft(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-500" />
+          <span><span className="block text-sm font-bold text-white">Fase palsu</span><span className="block text-[11px] text-slate-400">Role yang sudah mati / kemampuannya habis tetap "dipanggil" dengan jeda acak, jadi pemain tidak bisa menebak dari jeda.</span></span>
+        </label>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={pinDraft} onChange={e => setPinDraft(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-500" />
+          <span><span className="block text-sm font-bold text-white">PIN pembuka role</span><span className="block text-[11px] text-slate-400">Tiap pemain membuat PIN 4 digit sendiri; melihat role lagi (selama gilirannya) harus memasukkan PIN.</span></span>
+        </label>
+      </div>
       {setupIssues.length > 0 && (
         <div className="rounded-2xl border border-red-800/60 bg-red-950/40 p-3 space-y-1">
           {setupIssues.map((m, i) => <p key={i} className="text-xs text-red-300">⛔ {m}</p>)}
@@ -714,7 +819,7 @@ export default function App() {
           const roleList = Object.entries(roleCountsDraft).flatMap(([role, count]) => Array(Number(count)).fill(role));
           const shuffledRoles = shuffle(roleList);
           const players = trimmed.map((name, idx) => ({ id: 'player_' + (idx + 1) + '_' + Date.now(), name, role: shuffledRoles[idx], alive: true, loverId: null, protectedLastNight: false, protectedThisNight: false, deathReason: null, deathNight: null, deathDay: null, hunterRevengeUsed: false, convertedToWerewolf: false }));
-          setGameState({ ...createInitialGameState(), players, currentPhase: 'ROLE_SUMMARY', roleCounts: { ...roleCountsDraft }, gameLog: addLog([], 1, 1, 'INFO', `Permainan dibuat dengan ${playerCount} pemain.`) });
+          setGameState({ ...createInitialGameState(), players, currentPhase: 'ROLE_SUMMARY', roleCounts: { ...roleCountsDraft }, fakePhasesEnabled: fakeDraft, rolePinEnabled: pinDraft, gameLog: addLog([], 1, 1, 'INFO', `Permainan dibuat dengan ${playerCount} pemain.`) });
         }} disabled={!canStart} className="w-2/3 py-3.5 disabled:opacity-40 disabled:cursor-not-allowed rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition">
           <Sparkles className="w-5 h-5" /><span>ACAK ROLE</span>
         </button>
@@ -745,33 +850,82 @@ export default function App() {
   };
 
   const renderRoleReveal = () => {
-    const { revealPlayerIndex, isRoleCardOpen, players } = gameState;
+    const { revealPlayerIndex, players } = gameState;
     const currentPlayer = players[revealPlayerIndex];
     if (!currentPlayer) return null;
     const roleMeta = ROLES[currentPlayer.role] || ROLES.WARGA;
     const Icon = ROLE_ICONS[currentPlayer.role] || User;
+    const pinOn = !!gameState.rolePinEnabled;
+    const savedPin = rolePinsRef.current[currentPlayer.id];
+    const gated = pinOn && !pinUnlocked;
+    const hasViewed = viewedIndex === revealPlayerIndex;
+
+    const handlePinDigit = (digit) => {
+      if (pinInput.length >= PIN_LENGTH) return;
+      const next = pinInput + digit;
+      setPinError('');
+      if (next.length < PIN_LENGTH) { setPinInput(next); return; }
+      setPinInput('');
+      if (!savedPin) { rolePinsRef.current[currentPlayer.id] = next; setPinUnlocked(true); return; }
+      if (savedPin === next) setPinUnlocked(true); else setPinError('PIN salah, coba lagi.');
+    };
+
+    const holdProps = {
+      role: 'button', tabIndex: 0, 'aria-label': 'Tahan untuk melihat role',
+      onPointerDown: (e) => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {} setIsHolding(true); },
+      onPointerUp: () => setIsHolding(false),
+      onPointerCancel: () => setIsHolding(false),
+      onPointerLeave: () => setIsHolding(false),
+      onLostPointerCapture: () => setIsHolding(false),
+      onContextMenu: (e) => e.preventDefault(),
+      onKeyDown: (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); setIsHolding(true); } },
+      onKeyUp: (e) => { if (e.key === ' ' || e.key === 'Enter') setIsHolding(false); },
+      onBlur: () => setIsHolding(false),
+      style: { touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }
+    };
+
     return (
       <div className="max-w-md mx-auto p-4 sm:p-6 min-h-[80vh] flex flex-col justify-between space-y-6 animate-fadeIn">
         <div className="text-center space-y-1"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PEMBAGIAN ROLE ({revealPlayerIndex + 1} / {players.length})</span><h2 className="text-3xl font-black text-white">{currentPlayer.name}</h2><p className="text-xs text-amber-300">Serahkan perangkat hanya kepada {currentPlayer.name}.</p></div>
-        <div className="flex-1 flex items-center justify-center my-4">
-          {!isRoleCardOpen ? (
-            <div onClick={() => setGameState(prev => ({ ...prev, isRoleCardOpen: true }))} className="w-full aspect-[3/4] max-w-xs rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 flex flex-col items-center justify-center p-6 text-center cursor-pointer shadow-2xl hover:border-amber-400 transition">
-              <div className="w-20 h-20 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 mb-4"><Lock className="w-10 h-10 text-amber-400" /></div>
-              <h3 className="text-base font-bold text-white mb-1">ROLE RAHASIA</h3><p className="text-xs text-slate-400">Ketuk untuk membuka kartu role.</p>
+        <div className="flex-1 flex flex-col items-center justify-center my-4 gap-4">
+          {gated ? (
+            <div className="w-full max-w-xs rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 p-5 text-center space-y-4 shadow-2xl">
+              <div className="w-14 h-14 mx-auto rounded-full bg-slate-950 flex items-center justify-center border border-slate-800"><Lock className="w-7 h-7 text-amber-400" /></div>
+              <div>
+                <h3 className="text-base font-bold text-white">{savedPin ? 'MASUKKAN PIN' : 'BUAT PIN 4 DIGIT'}</h3>
+                <p className="text-[11px] text-slate-400 mt-1">{savedPin ? 'PIN yang kamu buat tadi.' : 'Ingat PIN ini; dipakai jika ingin melihat role lagi.'}</p>
+              </div>
+              <div className="flex justify-center gap-2">{Array.from({ length: PIN_LENGTH }).map((_, i) => <span key={i} className={`w-3.5 h-3.5 rounded-full border ${i < pinInput.length ? 'bg-amber-400 border-amber-300' : 'border-slate-600'}`} />)}</div>
+              {pinError && <p className="text-xs font-bold text-red-400">{pinError}</p>}
+              <div className="grid grid-cols-3 gap-2">
+                {['1','2','3','4','5','6','7','8','9'].map(d => <button key={d} onClick={() => handlePinDigit(d)} className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-lg transition">{d}</button>)}
+                <span />
+                <button onClick={() => handlePinDigit('0')} className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-black text-lg transition">0</button>
+                <button onClick={() => { setPinError(''); setPinInput(v => v.slice(0, -1)); }} aria-label="Hapus" className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition"><Delete className="w-5 h-5" /></button>
+              </div>
             </div>
           ) : (
-            <div className={`w-full max-w-xs rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl space-y-6 wf-flip`}>
-              <div className="space-y-3"><Icon className={`w-16 h-16 mx-auto ${roleMeta.color}`} /><h3 className={`text-2xl font-black uppercase tracking-wider ${roleMeta.color}`}>{roleMeta.name}</h3><span className="inline-block px-3 py-1 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-200">Tim {roleMeta.team}</span></div>
-              <p className="text-xs text-slate-200 leading-relaxed bg-black/40 p-3.5 rounded-2xl border border-white/10">{roleMeta.desc}</p>
-              <button onClick={() => setGameState(prev => ({ ...prev, isRoleCardOpen: false }))} className="px-4 py-2 rounded-xl bg-black/50 hover:bg-black/70 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition"><Unlock className="w-3.5 h-3.5" /><span>Sembunyikan Role</span></button>
+            <div {...holdProps} className="w-full max-w-xs aspect-[3/4] select-none outline-none cursor-pointer">
+              {!isHolding ? (
+                <div className="w-full h-full rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 border-2 border-dashed border-amber-500/40 flex flex-col items-center justify-center p-6 text-center shadow-2xl hover:border-amber-400 transition">
+                  <div className="w-20 h-20 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 mb-4"><Lock className="w-10 h-10 text-amber-400" /></div>
+                  <h3 className="text-base font-bold text-white mb-1">ROLE RAHASIA</h3><p className="text-xs text-slate-400">{hasViewed ? 'Tahan lagi untuk melihat. ' : ''}Tahan kartu ini untuk melihat role. Lepas untuk menutup.</p>
+                </div>
+              ) : (
+                <div className={`w-full h-full rounded-3xl bg-gradient-to-br ${roleMeta.accent} border-2 ${roleMeta.border} p-6 flex flex-col items-center justify-between text-center shadow-2xl`}>
+                  <div className="space-y-3"><Icon className={`w-16 h-16 mx-auto ${roleMeta.color}`} /><h3 className={`text-2xl font-black uppercase tracking-wider ${roleMeta.color}`}>{roleMeta.name}</h3><span className="inline-block px-3 py-1 rounded-full bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-200">Tim {roleMeta.team}</span></div>
+                  <p className="text-xs text-slate-200 leading-relaxed bg-black/40 p-3.5 rounded-2xl border border-white/10">{roleMeta.desc}</p>
+                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Unlock className="w-3 h-3" />Lepas untuk menutup</span>
+                </div>
+              )}
             </div>
           )}
         </div>
         <div>
-          {isRoleCardOpen ? (
-            <button onClick={() => setGameState(prev => { const nextIndex = prev.revealPlayerIndex + 1; if (nextIndex >= prev.players.length) return { ...prev, currentPhase: 'NIGHT_INTRO', nightNumber: 1, gameLog: addLog(prev.gameLog, 1, 1, 'INFO', 'Pembagian role selesai. Memulai Malam 1.') }; return { ...prev, revealPlayerIndex: nextIndex, isRoleCardOpen: false }; })} className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT PEMAIN NEXT</span><ArrowRight className="w-5 h-5" /></button>
+          {hasViewed && !isHolding ? (
+            <button onClick={() => setGameState(prev => { const nextIndex = prev.revealPlayerIndex + 1; if (nextIndex >= prev.players.length) return { ...prev, currentPhase: 'NIGHT_INTRO', nightNumber: 1, isRoleCardOpen: false, gameLog: addLog(prev.gameLog, 1, 1, 'INFO', 'Pembagian role selesai. Memulai Malam 1.') }; return { ...prev, revealPlayerIndex: nextIndex, isRoleCardOpen: false }; })} className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT PEMAIN NEXT</span><ArrowRight className="w-5 h-5" /></button>
           ) : (
-            <button onClick={() => setGameState(prev => ({ ...prev, isRoleCardOpen: true }))} className="w-full py-4 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 shadow-xl transition">LIHAT ROLE</button>
+            <p className="text-center text-xs text-slate-500 py-4">{gated ? 'Masukkan PIN untuk membuka kartu.' : 'Tombol lanjut muncul setelah role dilihat.'}</p>
           )}
         </div>
       </div>
@@ -866,6 +1020,39 @@ export default function App() {
     );
   };
 
+  const renderNightBodyguard = () => {
+    const actor = getActor(gameState);
+    const draft = gameState.draft || {};
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className="inline-flex items-center justify-center p-3 rounded-2xl bg-teal-950/90 border border-teal-700/60 text-teal-300 shadow-lg"><ShieldCheck className="w-8 h-8" /></div><h2 className="text-2xl font-black text-teal-300">BODYGUARD PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Pilih 1 pemain lain untuk dikawal. Jika diserang Werewolf, Bodyguard mati menggantikannya.</p></div>
+        {actorBanner(actor)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[40vh] overflow-y-auto">
+          {getLivingTargets(gameState, 'BODYGUARD', actor?.id).map(player => { const isSelected = draft.targetId === player.id; return <button key={player.id} onClick={() => setDraft({ targetId: player.id })} className={`p-3.5 rounded-2xl border text-xs sm:text-sm font-bold text-left transition flex items-center justify-between ${isSelected ? 'bg-teal-950/80 border-teal-500 text-teal-200' : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:bg-slate-800'}`}><span className="truncate">{player.name}</span>{isSelected && <ShieldCheck className="w-4 h-4 text-teal-300 shrink-0" />}</button>; })}
+        </div>
+        <div className="flex gap-3"><button onClick={() => handleSkipNightAction('BODYGUARD', 'Bodyguard SKIP.')} className="w-1/3 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-xs transition">SKIP</button><button onClick={handleConfirmBodyguard} disabled={!draft.targetId} className="w-2/3 py-4 rounded-2xl bg-gradient-to-r from-teal-700 to-teal-600 hover:from-teal-600 hover:to-teal-500 disabled:opacity-40 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>KONFIRMASI BODYGUARD</span><ArrowRight className="w-5 h-5" /></button></div>
+      </div>
+    );
+  };
+
+  const renderNightFake = () => {
+    const role = gameState.fakeRole;
+    const meta = ROLES[role] || ROLES.WARGA;
+    const FakeIcon = ROLE_ICONS[role] || User;
+    const remaining = Math.max(0, Math.ceil(((gameState.fakeEndTimestamp || 0) - fakeNow) / 1000));
+    return (
+      <div className="max-w-lg mx-auto p-4 sm:p-6 space-y-6 animate-fadeIn">
+        <div className="text-center space-y-2"><div className={`inline-flex items-center justify-center p-3 rounded-2xl ${meta.bg} border ${meta.border} ${meta.color} shadow-lg`}><FakeIcon className="w-8 h-8" /></div><h2 className={`text-2xl font-black uppercase ${meta.color}`}>{meta.name} PHASE</h2><p className="text-xs sm:text-sm text-slate-300">Panggil {meta.name} seperti biasa: "buka mata … tutup mata."</p></div>
+        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 text-center space-y-2 shadow-xl">
+          <span className="inline-block px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-black uppercase tracking-widest text-amber-300">Fase pura-pura · tidak ada aksi</span>
+          <p className="text-xs text-slate-400">Lanjut otomatis setelah jeda acak.</p>
+          <div className="text-3xl font-black font-mono text-slate-300">{remaining}s</div>
+        </div>
+        <button onClick={() => finishFakePhase(role)} className="w-full py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs transition">LEWATI JEDA</button>
+      </div>
+    );
+  };
+
   const renderNightSheriff = () => {
     const actor = getActor(gameState);
     const draft = gameState.draft || {};
@@ -956,7 +1143,7 @@ export default function App() {
         {(gameState.lastNightDeaths || []).length === 0 ? (
           <div className="space-y-2"><Sun className="w-10 h-10 text-emerald-400 mx-auto" /><h3 className="text-xl font-black text-emerald-400">Semua Pemain Selamat!</h3><p className="text-xs text-slate-300">Semalam tidak ada pemain yang tereliminasi.</p></div>
         ) : (
-          <div className="space-y-3"><Skull className="w-10 h-10 text-red-400 mx-auto" /><h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3><div className="space-y-2 wf-stagger">{(gameState.lastNightDeaths || []).map(({ player, reason }) => <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between"><span className="font-black text-white text-sm">{player.name}</span><span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">{DEATH_REASON_LABELS[reason] || reason}</span></div>)}</div></div>
+          <div className="space-y-3"><Skull className="w-10 h-10 text-red-400 mx-auto" /><h3 className="text-base font-bold text-red-400">Pemain Tereliminasi Semalam:</h3><div className="space-y-2">{(gameState.lastNightDeaths || []).map(({ player, reason }) => <div key={player.id} className="p-3.5 bg-red-950/60 border border-red-800/80 rounded-2xl flex items-center justify-between"><span className="font-black text-white text-sm">{player.name}</span><span className="text-[10px] px-2.5 py-1 rounded-full bg-red-900/80 text-red-200 font-bold border border-red-700/60">{DEATH_REASON_LABELS[reason] || reason}</span></div>)}</div></div>
         )}
       </div>
       <button onClick={() => setGameState(prev => ({ ...prev, currentPhase: 'DISCUSSION', discussionEndTimestamp: null, isTimerPaused: false, pausedRemainingSeconds: null, gameLog: addLog(prev.gameLog, prev.nightNumber, prev.dayNumber, 'INFO', `Memulai diskusi Hari ${prev.dayNumber}.`) }))} className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-black text-sm shadow-xl flex items-center justify-center gap-2 transition"><span>LANJUT KE WAKTU DISKUSI</span><ArrowRight className="w-5 h-5" /></button>
@@ -1161,6 +1348,8 @@ export default function App() {
       case 'NIGHT_CUPID': return renderNightCupid();
       case 'NIGHT_WEREWOLF': return renderNightWerewolf();
       case 'NIGHT_GUARDIAN': return renderNightGuardian();
+      case 'NIGHT_BODYGUARD': return renderNightBodyguard();
+      case 'NIGHT_FAKE': return renderNightFake();
       case 'NIGHT_SHERIFF': return renderNightSheriff();
       case 'NIGHT_DOPPELGANGER': return renderNightDoppelganger();
       case 'NIGHT_SEER': return renderNightSeer();
@@ -1176,10 +1365,9 @@ export default function App() {
   };
 
   return (
-    <div data-scene={sceneForPhase(gameState.currentPhase, gameState.winner)} className="wf-app min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
-      <CinematicStyles />
-      <CinematicBackdrop />
-      <PhaseTitleCard phase={gameState.currentPhase} night={gameState.nightNumber} day={gameState.dayNumber} winner={gameState.winner} />
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-900/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-red-950/15 blur-[120px] pointer-events-none -z-10 rounded-full" />
 
       {gameState.loverDeathNotice && gameState.loverDeathNotice.length > 0 && (
         <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
