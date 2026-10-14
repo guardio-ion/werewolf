@@ -259,7 +259,6 @@ export function createInitialGameState() {
     fakeRole: null,
     fakeEndTimestamp: null,
     fakePhasesEnabled: true,
-    rolePinEnabled: false,
     currentVoterIndex: 0,
     votes: {},
     revealPlayerIndex: 0,
