@@ -1,7 +1,7 @@
 export const LOCAL_STORAGE_KEY =
-  'WEREWOLF_MODERATOR_ASSISTANT_STATE_V5';
+  'WEREWOLF_MODERATOR_ASSISTANT_STATE_V6';
 
-export const GAME_STATE_VERSION = 5;
+export const GAME_STATE_VERSION = 6;
 
 export function isWolfAligned(player) {
   return Boolean(
@@ -9,10 +9,9 @@ export function isWolfAligned(player) {
       (
         player.role === 'WEREWOLF' ||
         player.role === 'WOLF_CUB' ||
-        (
-          player.role === 'TRAITOR' &&
-          player.convertedToWerewolf
-        )
+        player.role === 'ALPHA_WOLF' ||
+        // Traitor yang berubah, pemain yang ditulari Alpha Wolf
+        player.convertedToWerewolf
       )
   );
 }
@@ -24,7 +23,8 @@ export function getEffectiveTeam(player) {
 
   if (
     player.role === 'WEREWOLF' ||
-    player.role === 'WOLF_CUB'
+    player.role === 'WOLF_CUB' ||
+    player.role === 'ALPHA_WOLF'
   ) {
     return 'Evil';
   }
@@ -241,7 +241,6 @@ export function createInitialGameState() {
     doppelgangerRoleChangeNotice: null,
     doppelgangerRevealNextPhase: null,
     doppelgangerRevealWinner: null,
-    mayorRevealed: false,
     seerTargetId: null,
     seerResult: null,
     witchHealUsedThisNight: false,
@@ -259,6 +258,12 @@ export function createInitialGameState() {
     fakeRole: null,
     fakeEndTimestamp: null,
     fakePhasesEnabled: true,
+    eventsEnabled: false,
+    activeEvent: null,
+    eventDrawnNight: 0,
+    skipVotes: '',
+    alphaConvertTargetId: null,
+    werewolfMode: 'KILL',
     currentVoterIndex: 0,
     votes: {},
     revealPlayerIndex: 0,
