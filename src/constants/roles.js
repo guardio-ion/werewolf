@@ -69,16 +69,6 @@ export const ROLES = {
     desc: 'Hanya aktif Malam 1 dan memilih 2 pemain menjadi Lovers. Jika salah satu mati, pasangannya ikut mati.'
   },
 
-  MAYOR: {
-    name: 'Mayor',
-    team: 'Warga',
-    color: 'text-amber-400',
-    bg: 'bg-amber-950/90',
-    border: 'border-amber-600/60',
-    accent: 'from-amber-950 via-slate-900 to-slate-950',
-    desc: 'Sekali per game dapat mengungkapkan identitas sebagai Mayor. Setelah terungkap, bobot suaranya menjadi 2 pada voting.'
-  },
-
   SHERIFF: {
     name: 'Sheriff',
     team: 'Warga',
@@ -107,6 +97,36 @@ export const ROLES = {
     border: 'border-slate-700',
     accent: 'from-slate-800 to-slate-950',
     desc: 'Awalnya di kubu Warga. Jika seluruh Werewolf mati dan Traitor masih hidup, ia berubah menjadi Werewolf.'
+  },
+
+  ALPHA_WOLF: {
+    name: 'Alpha Wolf',
+    team: 'Evil',
+    color: 'text-red-300',
+    bg: 'bg-red-950/90',
+    border: 'border-red-500/60',
+    accent: 'from-red-950 via-slate-900 to-slate-950',
+    desc: 'Werewolf pemimpin. Sekali per game, sebagai pengganti serangan malam, ia menulari 1 pemain: korban tidak mati, tetapi diam-diam pindah ke tim Werewolf.'
+  },
+
+  ILLUSIONIST: {
+    name: 'Illusionist',
+    team: 'Warga',
+    color: 'text-fuchsia-300',
+    bg: 'bg-fuchsia-950/90',
+    border: 'border-fuchsia-600/60',
+    accent: 'from-fuchsia-950 via-slate-900 to-slate-950',
+    desc: 'Sekali per game memblokir kemampuan malam 1 pemain. Aksi target tetap dijalankan tetapi tidak berefek, dan target tidak diberi tahu.'
+  },
+
+  CURSED: {
+    name: 'Cursed',
+    team: 'Warga',
+    color: 'text-lime-300',
+    bg: 'bg-lime-950/90',
+    border: 'border-lime-700/60',
+    accent: 'from-lime-950 via-slate-900 to-slate-950',
+    desc: 'Terlihat dan bermain sebagai Warga. Jika diserang Werewolf, ia tidak mati melainkan berubah menjadi Werewolf. Seer melihatnya sebagai Warga sampai berubah.'
   },
 
   WOLF_CUB: {
